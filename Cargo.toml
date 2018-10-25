@@ -7,3 +7,4 @@ authors = ["Emilio Cobos Álvarez <emilio@crisal.io>"]
 app_units = "0.7"
 euclid = "0.19"
 bitflags = "1.0"
+smallvec = "0.6"

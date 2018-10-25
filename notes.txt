@@ -1,0 +1,27 @@
+Margin collapsing in LayoutNG, etc... - chat with ikilpatrick at TPAC 2018 - 25. Oct
+====================================================================
+
+ * Single pass.
+
+You get your root BFC. All coordinates relative to it.
+
+ * Block offset
+ * Line offset (inline but w/o direction)
+
+MarginStrut {
+  biggest_positive_margin
+  smallest_negative_margin
+}
+
+Always compute the pos a child relative to its parent block, you only reposition
+the float...
+
+When you reach a new BFC you need to do potentially 2 layouts to determine what
+is positioned.
+
+Layout in parallel?
+
+ * You can lay out in parallel all direct children that stablish a BFC.
+ * ng_exclusion_space.cc: Float positioning and co. Shelves algorithm exploiting
+   floats' properties.
+
