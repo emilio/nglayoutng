@@ -62,7 +62,7 @@ impl LayoutNode {
         self.children()
             .iter()
             .cloned()
-            .filter(move |el| display_tree[*el].style.is_out_of_flow())
+            .filter(move |el| !display_tree[*el].style.is_out_of_flow())
     }
 }
 
