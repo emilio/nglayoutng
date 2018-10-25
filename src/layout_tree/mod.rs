@@ -3,10 +3,10 @@ use style;
 use logical_geometry;
 
 #[derive(Debug, Copy, Clone)]
-pub struct DisplayNodeId(usize);
+pub struct LayoutNodeId(usize);
 
 pub enum LeafKind {
-    Text { text: String, },
+    Text { text: Box<str>, },
 }
 
 pub enum ContainerKind {
@@ -16,10 +16,10 @@ pub enum ContainerKind {
     Inline,
 }
 
-pub enum DisplayNodeKind {
+pub enum LayoutNodeKind {
     Leaf { kind: LeafKind },
     Container {
-        children: Vec<DisplayNodeId>,
+        children: Vec<LayoutNodeId>,
         kind: ContainerKind,
     }
 }
@@ -29,13 +29,13 @@ pub enum DisplayNodeKind {
 ///
 /// A display node is the primary box of an element, but contains no layout
 /// information, that's left to fragment.
-pub struct DisplayNode {
+pub struct LayoutNode {
     pub style: style::ComputedStyle,
-    pub parent: Option<DisplayNodeId>,
-    pub kind: DisplayNodeKind,
+    pub parent: Option<LayoutNodeId>,
+    pub kind: LayoutNodeKind,
 }
 
-impl DisplayNode {
+impl LayoutNode {
     pub fn display(&self) -> style::Display {
         self.style.display
     }
@@ -48,17 +48,17 @@ impl DisplayNode {
         self.style.writing_mode
     }
 
-    pub fn children(&self) -> &[DisplayNodeId] {
+    pub fn children(&self) -> &[LayoutNodeId] {
         match self.kind {
-            DisplayNodeKind::Container { ref children, .. } => &*children,
-            DisplayNodeKind::Leaf { .. } => &[],
+            LayoutNodeKind::Container { ref children, .. } => &*children,
+            LayoutNodeKind::Leaf { .. } => &[],
         }
     }
 
     pub fn in_flow_children<'a, 'dt: 'a>(
         &'a self,
         display_tree: &'dt DisplayTree,
-    ) -> impl Iterator<Item = DisplayNodeId> + 'a {
+    ) -> impl Iterator<Item = LayoutNodeId> + 'a {
         self.children()
             .iter()
             .cloned()
@@ -67,23 +67,23 @@ impl DisplayNode {
 }
 
 pub struct DisplayTree {
-    nodes: allocator::Allocator<DisplayNode>,
-    root: DisplayNodeId,
+    nodes: allocator::Allocator<LayoutNode>,
+    root: LayoutNodeId,
 }
 
 impl DisplayTree {
     pub fn new() -> Self {
-        let root = DisplayNode {
+        let root = LayoutNode {
             style: style::ComputedStyle::for_viewport(),
             parent: None,
-            kind: DisplayNodeKind::Container {
+            kind: LayoutNodeKind::Container {
                 children: Vec::new(),
                 kind: ContainerKind::Viewport,
             }
         };
 
         let mut nodes = allocator::Allocator::default();
-        let root = DisplayNodeId(nodes.allocate(root));
+        let root = LayoutNodeId(nodes.allocate(root));
 
         Self {
             nodes,
@@ -91,16 +91,16 @@ impl DisplayTree {
         }
     }
 
-    pub fn root(&self) -> DisplayNodeId {
+    pub fn root(&self) -> LayoutNodeId {
         self.root
     }
 
-    pub fn insert(&mut self, node: DisplayNode) -> DisplayNodeId {
+    pub fn insert(&mut self, node: LayoutNode) -> LayoutNodeId {
         assert!(node.parent.is_some());
-        DisplayNodeId(self.nodes.allocate(node))
+        LayoutNodeId(self.nodes.allocate(node))
     }
 
-    pub fn destroy(&mut self, node: DisplayNodeId) {
+    pub fn destroy(&mut self, node: LayoutNodeId) {
         // TODO(emilio): This would have to clean up fragments and such from
         // other places.
         let node = self.nodes.deallocate(node.0);
@@ -110,16 +110,16 @@ impl DisplayTree {
     }
 }
 
-impl ::std::ops::Index<DisplayNodeId> for DisplayTree {
-    type Output = DisplayNode;
+impl ::std::ops::Index<LayoutNodeId> for DisplayTree {
+    type Output = LayoutNode;
 
-    fn index(&self, id: DisplayNodeId) -> &DisplayNode {
+    fn index(&self, id: LayoutNodeId) -> &LayoutNode {
         &self.nodes[id.0]
     }
 }
 
-impl ::std::ops::IndexMut<DisplayNodeId> for DisplayTree {
-    fn index_mut(&mut self, id: DisplayNodeId) -> &mut DisplayNode {
+impl ::std::ops::IndexMut<LayoutNodeId> for DisplayTree {
+    fn index_mut(&mut self, id: LayoutNodeId) -> &mut LayoutNode {
         &mut self.nodes[id.0]
     }
 }

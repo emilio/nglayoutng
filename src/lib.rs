@@ -7,6 +7,6 @@ extern crate smallvec;
 pub mod allocator;
 pub mod style;
 pub mod logical_geometry;
-pub mod display_tree;
+pub mod layout_tree;
 
 pub use app_units::Au;
