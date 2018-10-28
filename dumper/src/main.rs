@@ -21,7 +21,10 @@ fn main() {
         let input = args.value_of("input").unwrap();
         let mut file = File::open(input).expect("Couldn't open input file");
 
-        let _builder = LayoutTreeBuilder::new(&mut file)
-            .expect("Failed to parse input file?");
+        let builder =
+            LayoutTreeBuilder::new(&mut file).expect("Failed to parse input file?");
+
+        let result = builder.build();
+        println!("{:#?}", result);
     }
 }

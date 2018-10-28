@@ -5,6 +5,7 @@ use logical_geometry::{self, LogicalSize, LogicalMargin};
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Display {
     None,
+    Contents,
     Block,
     Inline,
     // ..
@@ -93,12 +94,14 @@ impl Default for LengthPercentageOrAuto {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum PseudoElement {
     Before,
     After,
     Viewport,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct MutableComputedStyle {
     pub pseudo: Option<PseudoElement>,
     pub writing_mode: logical_geometry::WritingMode,
@@ -145,6 +148,7 @@ impl MutableComputedStyle {
 /// A version of `MutableComputedStyle` that can't be mutated. This is enforced
 /// by the field being private and only `Deref` (but not `DerefMut`) being
 /// implemented.
+#[derive(Debug, Clone, PartialEq)]
 pub struct ComputedStyle(MutableComputedStyle);
 impl ::std::ops::Deref for ComputedStyle {
     type Target = MutableComputedStyle;

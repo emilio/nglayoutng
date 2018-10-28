@@ -263,8 +263,10 @@ fn compute_styles_for_tree(
         }
     }
 
-    map.insert(
-        &*node.0,
-        style.finish(),
-    );
+    let style = style.finish();
+    for child in node.children() {
+        compute_styles_for_tree(&child, rules, Some(&style), map);
+    }
+
+    map.insert(&*node.0, style);
 }
