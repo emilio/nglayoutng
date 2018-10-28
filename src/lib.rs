@@ -1,8 +1,12 @@
 extern crate app_units;
 #[macro_use]
 extern crate bitflags;
+#[macro_use]
+extern crate cssparser;
 extern crate euclid;
 extern crate smallvec;
+extern crate html5ever;
+extern crate kuchiki;
 
 pub mod allocator;
 pub mod style;

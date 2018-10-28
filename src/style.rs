@@ -77,8 +77,20 @@ pub struct Length(pub Au);
 
 #[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub struct LengthPercentage {
-    pub fixed: Au,
+    pub fixed: Length,
     pub percentage: Option<Percentage>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum LengthPercentageOrAuto {
+    LengthPercentage(LengthPercentage),
+    Auto,
+}
+
+impl Default for LengthPercentageOrAuto {
+    fn default() -> Self {
+        LengthPercentageOrAuto::Auto
+    }
 }
 
 pub enum PseudoElement {
@@ -87,7 +99,7 @@ pub enum PseudoElement {
     Viewport,
 }
 
-pub struct ComputedStyle {
+pub struct MutableComputedStyle {
     pub pseudo: Option<PseudoElement>,
     pub writing_mode: logical_geometry::WritingMode,
 
@@ -99,8 +111,8 @@ pub struct ComputedStyle {
     pub direction: Direction,
     pub text_orientation: TextOrientation,
 
-    pub width: LengthPercentage,
-    pub height: LengthPercentage,
+    pub width: LengthPercentageOrAuto,
+    pub height: LengthPercentageOrAuto,
 
     pub padding_top: LengthPercentage,
     pub padding_right: LengthPercentage,
@@ -123,27 +135,45 @@ pub struct ComputedStyle {
     pub left: LengthPercentage,
 }
 
+impl MutableComputedStyle {
+    /// Finish mutating this style.
+    pub fn finish(self) -> ComputedStyle {
+        ComputedStyle(self)
+    }
+}
+
+/// A version of `MutableComputedStyle` that can't be mutated. This is enforced
+/// by the field being private and only `Deref` (but not `DerefMut`) being
+/// implemented.
+pub struct ComputedStyle(MutableComputedStyle);
+impl ::std::ops::Deref for ComputedStyle {
+    type Target = MutableComputedStyle;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl ComputedStyle {
-    pub fn for_viewport() -> Self {
-        let display = Display::Block;
+    pub fn initial() -> MutableComputedStyle {
         let direction = Direction::Ltr;
         let text_orientation = TextOrientation::Mixed;
         let writing_mode = WritingMode::HorizontalTb;
 
-        Self {
-            pseudo: Some(PseudoElement::Viewport),
+        MutableComputedStyle {
+            pseudo: None,
             writing_mode: logical_geometry::WritingMode::new(
                 direction,
                 writing_mode,
                 text_orientation,
             ),
-            display,
             direction,
+            computed_writing_mode: writing_mode,
             text_orientation,
+            display: Display::Inline,
             position: Position::Static,
             float: Float::None,
             clear: Clear::None,
-            computed_writing_mode: writing_mode,
 
             width: Default::default(),
             height: Default::default(),
@@ -168,6 +198,24 @@ impl ComputedStyle {
             bottom: Default::default(),
             left: Default::default(),
         }
+    }
+
+    pub fn inherited(&self) -> MutableComputedStyle {
+        MutableComputedStyle {
+            direction: self.direction,
+            writing_mode: self.writing_mode,
+            text_orientation: self.text_orientation,
+            computed_writing_mode: self.computed_writing_mode,
+            .. Self::initial()
+        }
+    }
+
+    pub fn for_viewport() -> ComputedStyle {
+        MutableComputedStyle {
+            pseudo: Some(PseudoElement::Viewport),
+            display: Display::Block,
+            .. Self::initial()
+        }.finish()
     }
 
 
@@ -198,7 +246,7 @@ impl ComputedStyle {
         )
     }
 
-    fn physical_size(&self) -> Size2D<LengthPercentage> {
+    fn physical_size(&self) -> Size2D<LengthPercentageOrAuto> {
         Size2D::new(
             self.width,
             self.height
@@ -213,7 +261,7 @@ impl ComputedStyle {
         self.position.is_out_of_flow() || self.is_floating()
     }
 
-    pub fn size(&self) -> LogicalSize<LengthPercentage> {
+    pub fn size(&self) -> LogicalSize<LengthPercentageOrAuto> {
         LogicalSize::from_physical(self.writing_mode, self.physical_size())
     }
 

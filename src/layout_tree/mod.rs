@@ -1,3 +1,5 @@
+mod builder;
+
 use allocator;
 use style;
 use logical_geometry;
