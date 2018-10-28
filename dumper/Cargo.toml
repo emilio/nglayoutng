@@ -1,0 +1,7 @@
+[package]
+name = "dumper"
+version = "0.1.0"
+authors = ["Emilio Cobos Álvarez <emilio@crisal.io>"]
+edition = "2018"
+
+[dependencies]

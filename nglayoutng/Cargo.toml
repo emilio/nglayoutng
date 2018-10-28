@@ -1,0 +1,13 @@
+[package]
+name = "nglayoutng"
+version = "0.1.0"
+authors = ["Emilio Cobos Álvarez <emilio@crisal.io>"]
+
+[dependencies]
+app_units = "0.7"
+euclid = "0.19"
+bitflags = "1.0"
+smallvec = "0.6"
+kuchiki = "0.7"
+html5ever = "0.22"
+cssparser = "0.24"
