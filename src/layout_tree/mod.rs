@@ -57,21 +57,21 @@ impl LayoutNode {
 
     pub fn in_flow_children<'a, 'dt: 'a>(
         &'a self,
-        display_tree: &'dt DisplayTree,
+        layout_tree: &'dt LayoutTree,
     ) -> impl Iterator<Item = LayoutNodeId> + 'a {
         self.children()
             .iter()
             .cloned()
-            .filter(move |el| !display_tree[*el].style.is_out_of_flow())
+            .filter(move |el| !layout_tree[*el].style.is_out_of_flow())
     }
 }
 
-pub struct DisplayTree {
+pub struct LayoutTree {
     nodes: allocator::Allocator<LayoutNode>,
     root: LayoutNodeId,
 }
 
-impl DisplayTree {
+impl LayoutTree {
     pub fn new() -> Self {
         let root = LayoutNode {
             style: style::ComputedStyle::for_viewport(),
@@ -110,7 +110,7 @@ impl DisplayTree {
     }
 }
 
-impl ::std::ops::Index<LayoutNodeId> for DisplayTree {
+impl ::std::ops::Index<LayoutNodeId> for LayoutTree {
     type Output = LayoutNode;
 
     fn index(&self, id: LayoutNodeId) -> &LayoutNode {
@@ -118,7 +118,7 @@ impl ::std::ops::Index<LayoutNodeId> for DisplayTree {
     }
 }
 
-impl ::std::ops::IndexMut<LayoutNodeId> for DisplayTree {
+impl ::std::ops::IndexMut<LayoutNodeId> for LayoutTree {
     fn index_mut(&mut self, id: LayoutNodeId) -> &mut LayoutNode {
         &mut self.nodes[id.0]
     }
