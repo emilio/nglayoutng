@@ -253,6 +253,16 @@ fn compute_styles_for_tree(
         }
     }
 
+    if let Some(style_attr) = element.attributes.borrow().get("style") {
+        let mut input = ParserInput::new(style_attr);
+        let mut input = Parser::new(&mut input);
+        if let Ok(declarations) = parse_declarations(&mut input) {
+            for ref declaration in declarations {
+                apply_declaration(&mut style, declaration);
+            }
+        }
+    }
+
     map.insert(
         &*node.0,
         style.finish(),
