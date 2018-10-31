@@ -11,6 +11,17 @@ pub enum Display {
     // ..
 }
 
+impl Display {
+    fn blockify(self) -> Self {
+        match self {
+            Display::Block |
+            Display::None |
+            Display::Contents => self,
+            Display::Inline => Display::Block,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Position {
     Static,
@@ -107,6 +118,10 @@ pub struct MutableComputedStyle {
     pub writing_mode: logical_geometry::WritingMode,
 
     pub display: Display,
+    /// The original display value of the item.
+    ///
+    /// Needed to compute hypothetical positions of abspos elements.
+    pub original_display: Display,
     pub computed_writing_mode: WritingMode,
     pub position: Position,
     pub float: Float,
@@ -140,7 +155,11 @@ pub struct MutableComputedStyle {
 
 impl MutableComputedStyle {
     /// Finish mutating this style.
-    pub fn finish(self) -> ComputedStyle {
+    pub fn finish(mut self, is_root_element: bool) -> ComputedStyle {
+        self.original_display = self.display;
+        if self.is_floating() || self.is_out_of_flow() || is_root_element {
+            self.display = self.display.blockify();
+        }
         ComputedStyle(self)
     }
 }
@@ -155,6 +174,16 @@ impl ::std::ops::Deref for ComputedStyle {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl MutableComputedStyle {
+    pub fn is_floating(&self) -> bool {
+        self.float != Float::None
+    }
+
+    pub fn is_out_of_flow(&self) -> bool {
+        self.position.is_out_of_flow() || self.is_floating()
     }
 }
 
@@ -175,6 +204,7 @@ impl ComputedStyle {
             computed_writing_mode: writing_mode,
             text_orientation,
             display: Display::Inline,
+            original_display: Display::Inline,
             position: Position::Static,
             float: Float::None,
             clear: Clear::None,
@@ -218,8 +248,9 @@ impl ComputedStyle {
         MutableComputedStyle {
             pseudo: Some(PseudoElement::Viewport),
             display: Display::Block,
+            original_display: Display::Block,
             .. Self::initial()
-        }.finish()
+        }.finish(false)
     }
 
 
@@ -255,14 +286,6 @@ impl ComputedStyle {
             self.width,
             self.height
         )
-    }
-
-    pub fn is_floating(&self) -> bool {
-        self.float != Float::None
-    }
-
-    pub fn is_out_of_flow(&self) -> bool {
-        self.position.is_out_of_flow() || self.is_floating()
     }
 
     pub fn size(&self) -> LogicalSize<LengthPercentageOrAuto> {

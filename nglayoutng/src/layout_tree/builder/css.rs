@@ -263,7 +263,7 @@ fn compute_styles_for_tree(
         }
     }
 
-    let style = style.finish();
+    let style = style.finish(inherited_style.is_none());
     for child in node.children() {
         compute_styles_for_tree(&child, rules, Some(&style), map);
     }
