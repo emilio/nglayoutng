@@ -1,5 +1,5 @@
 mod dom;
-mod css;
+pub mod css;
 
 use app_units::Au;
 use euclid::Size2D;

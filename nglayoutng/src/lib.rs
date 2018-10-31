@@ -9,6 +9,9 @@ extern crate euclid;
 extern crate smallvec;
 extern crate html5ever;
 extern crate kuchiki;
+#[macro_use]
+extern crate nglayoutng_derive;
+
 
 pub mod allocator;
 pub mod style;

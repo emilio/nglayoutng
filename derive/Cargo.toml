@@ -1,0 +1,13 @@
+[package]
+name = "nglayoutng_derive"
+version = "0.1.0"
+authors = ["Emilio Cobos Álvarez <emilio@crisal.io>"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+darling = "0.4"
+quote = "0.5.1"
+syn = { version = "0.13.1", features = ["visit"] }
+synstructure = "0.8"

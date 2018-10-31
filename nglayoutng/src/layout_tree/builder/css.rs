@@ -7,13 +7,80 @@
 
 use app_units::Au;
 use cssparser::{self, CowRcStr, Parser, ParserInput, Token};
+use smallvec::SmallVec;
 use std::collections::HashMap;
 use std::rc::Rc;
 use style::{self, ComputedStyle, MutableComputedStyle};
+use logical_geometry::WritingMode;
 
+#[derive(PropertyDeclaration)]
 pub enum PropertyDeclaration {
+    #[declaration(early, field = "computed_writing_mode")]
+    WritingMode(style::WritingMode),
+    #[declaration(early)]
+    Direction(style::Direction),
+    #[declaration(early)]
+    TextOrientation(style::TextOrientation),
+
     Width(style::LengthPercentageOrAuto),
     Height(style::LengthPercentageOrAuto),
+
+    #[declaration(logical)]
+    InlineSize(style::LengthPercentageOrAuto),
+    #[declaration(logical)]
+    BlockSize(style::LengthPercentageOrAuto),
+
+    MarginTop(style::LengthPercentageOrAuto),
+    MarginLeft(style::LengthPercentageOrAuto),
+    MarginBottom(style::LengthPercentageOrAuto),
+    MarginRight(style::LengthPercentageOrAuto),
+
+    #[declaration(logical)]
+    MarginBlockStart(style::LengthPercentageOrAuto),
+    #[declaration(logical)]
+    MarginBlockEnd(style::LengthPercentageOrAuto),
+    #[declaration(logical)]
+    MarginInlineStart(style::LengthPercentageOrAuto),
+    #[declaration(logical)]
+    MarginInlineEnd(style::LengthPercentageOrAuto),
+
+    PaddingTop(style::LengthPercentage),
+    PaddingLeft(style::LengthPercentage),
+    PaddingBottom(style::LengthPercentage),
+    PaddingRight(style::LengthPercentage),
+
+    #[declaration(logical)]
+    PaddingBlockStart(style::LengthPercentage),
+    #[declaration(logical)]
+    PaddingBlockEnd(style::LengthPercentage),
+    #[declaration(logical)]
+    PaddingInlineStart(style::LengthPercentage),
+    #[declaration(logical)]
+    PaddingInlineEnd(style::LengthPercentage),
+
+    BorderTopWidth(style::LengthPercentage),
+    BorderBottomWidth(style::LengthPercentage),
+    BorderLeftWidth(style::LengthPercentage),
+    BorderRightWidth(style::LengthPercentage),
+
+    #[declaration(logical)]
+    BorderBlockStartWidth(style::LengthPercentage),
+    #[declaration(logical)]
+    BorderBlockEndWidth(style::LengthPercentage),
+    #[declaration(logical)]
+    BorderInlineStartWidth(style::LengthPercentage),
+    #[declaration(logical)]
+    BorderInlineEndWidth(style::LengthPercentage),
+
+    Display(style::Display),
+    Position(style::Position),
+    BoxSizing(style::BoxSizing),
+
+    OverflowX(style::Overflow),
+    OverflowY(style::Overflow),
+
+    Float(style::Float),
+    Clear(style::Clear),
 }
 
 pub struct CssStyleRule {
@@ -37,7 +104,8 @@ pub enum Error<'i> {
     UnknownPropertyName(CowRcStr<'i>),
     UnknownLengthUnit(CowRcStr<'i>),
 }
-type ParseError<'i> = cssparser::ParseError<'i, Error<'i>>;
+
+pub type ParseError<'i> = cssparser::ParseError<'i, Error<'i>>;
 
 struct CssParser;
 impl<'i> cssparser::AtRuleParser<'i> for CssParser {
@@ -144,9 +212,71 @@ fn parse_length_or_percentage_or_auto<'i>(input: &mut Parser<'i, '_>) -> Result<
     Ok(style::LengthPercentageOrAuto::LengthPercentage(parse_length_or_percentage(input)?))
 }
 
+fn parse_overflow_shorthand<'i>(
+    input: &mut Parser<'i, '_>,
+) -> Result<SmallVec<[PropertyDeclaration; 1]>, ParseError<'i>> {
+    let mut ret = SmallVec::new();
+    let x = style::Overflow::parse(input)?;
+    let y = input.try(|i| style::Overflow::parse(i)).unwrap_or(x);
+    ret.push(PropertyDeclaration::OverflowX(x));
+    ret.push(PropertyDeclaration::OverflowY(y));
+    Ok(ret)
+}
+
+fn parse_four_sides<'i, L>(
+    input: &mut Parser<'i, '_>,
+    get_top: fn(L) -> PropertyDeclaration,
+    get_right: fn(L) -> PropertyDeclaration,
+    get_bottom: fn(L) -> PropertyDeclaration,
+    get_left: fn(L) -> PropertyDeclaration,
+    parse_one: fn(&mut Parser<'i, '_>) -> Result<L, ParseError<'i>>,
+) -> Result<SmallVec<[PropertyDeclaration; 1]>, ParseError<'i>>
+where
+    L: Clone,
+{
+    let mut ret = SmallVec::new();
+    let top = parse_one(input)?;
+    let right = input.try(parse_one).ok();
+    let bottom = input.try(parse_one).ok();
+    let left = input.try(parse_one).ok();
+
+    match (right, bottom, left) {
+        (Some(right), Some(bottom), Some(left)) => {
+            ret.push(get_top(top));
+            ret.push(get_right(right));
+            ret.push(get_bottom(bottom));
+            ret.push(get_left(left));
+        }
+        (None, None, None) => {
+            ret.push(get_top(top.clone()));
+            ret.push(get_right(top.clone()));
+            ret.push(get_bottom(top.clone()));
+            ret.push(get_left(top));
+        }
+        (Some(right), None, None) => {
+            ret.push(get_top(top.clone()));
+            ret.push(get_right(right.clone()));
+            ret.push(get_bottom(top));
+            ret.push(get_left(right));
+        }
+        (Some(right), Some(bottom), None) => {
+            ret.push(get_top(top));
+            ret.push(get_right(right.clone()));
+            ret.push(get_bottom(bottom));
+            ret.push(get_left(right));
+        }
+        _ => unreachable!(),
+    }
+
+    assert_eq!(ret.len(), 4);
+    Ok(ret)
+}
+
+
+
 struct PropertyDeclarationParser;
 impl<'i> cssparser::DeclarationParser<'i> for PropertyDeclarationParser {
-    type Declaration = PropertyDeclaration;
+    type Declaration = SmallVec<[PropertyDeclaration; 1]>;
     type Error = Error<'i>;
 
     fn parse_value<'t>(
@@ -154,26 +284,64 @@ impl<'i> cssparser::DeclarationParser<'i> for PropertyDeclarationParser {
         name: CowRcStr<'i>,
         input: &mut Parser<'i, 't>,
     ) -> Result<Self::Declaration, ParseError<'i>> {
-        Ok(match_ignore_ascii_case! { &name,
-            "height" => PropertyDeclaration::Height(parse_length_or_percentage_or_auto(input)?),
-            "width" => PropertyDeclaration::Width(parse_length_or_percentage_or_auto(input)?),
-            _ => return Err(input.new_custom_error(Error::UnknownPropertyName(name.clone()))),
-        })
+        if let Ok(longhand) = PropertyDeclaration::parse_longhand(&name, input) {
+            let mut declarations = SmallVec::new();
+            declarations.push(longhand);
+            return Ok(declarations)
+        }
+
+        match_ignore_ascii_case! { &name,
+            "margin" => parse_four_sides(
+                input,
+                PropertyDeclaration::MarginTop,
+                PropertyDeclaration::MarginRight,
+                PropertyDeclaration::MarginBottom,
+                PropertyDeclaration::MarginLeft,
+                parse_length_or_percentage_or_auto,
+            ),
+            "padding" => parse_four_sides(
+                input,
+                PropertyDeclaration::PaddingTop,
+                PropertyDeclaration::PaddingRight,
+                PropertyDeclaration::PaddingBottom,
+                PropertyDeclaration::PaddingLeft,
+                parse_length_or_percentage,
+            ),
+            "border-width" => parse_four_sides(
+                input,
+                PropertyDeclaration::BorderTopWidth,
+                PropertyDeclaration::BorderRightWidth,
+                PropertyDeclaration::BorderBottomWidth,
+                PropertyDeclaration::BorderLeftWidth,
+                parse_length_or_percentage,
+            ),
+            "overflow" => parse_overflow_shorthand(input),
+            _ => Err(input.new_custom_error(Error::UnknownPropertyName(name.clone()))),
+        }
     }
 }
 
 impl<'i> cssparser::AtRuleParser<'i> for PropertyDeclarationParser {
     type PreludeBlock = ();
     type PreludeNoBlock = ();
-    type AtRule = PropertyDeclaration;
+    type AtRule = SmallVec<[PropertyDeclaration; 1]>;
     type Error = Error<'i>;
 }
 
 pub fn parse_declarations<'i>(input: &mut Parser<'i, '_>) -> Result<Vec<PropertyDeclaration>, (ParseError<'i>, &'i str)> {
     let mut declarations = Vec::new();
     let iter = cssparser::DeclarationListParser::new(input, PropertyDeclarationParser);
-    for declaration in iter {
-        declarations.push(declaration?);
+    for declaration_list in iter {
+        let declaration_list = match declaration_list {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("CSS declaration dropped: {:?}", e);
+                continue;
+            }
+        };
+        for declaration in declaration_list {
+            declarations.push(declaration);
+        }
     }
     Ok(declarations)
 }
@@ -218,10 +386,45 @@ pub fn compute_styles(root: &kuchiki::NodeRef, rules: &[Rule]) -> StyleMap {
 }
 
 fn apply_declaration(style: &mut MutableComputedStyle, declaration: &PropertyDeclaration) {
-    match *declaration {
-        PropertyDeclaration::Height(val) => style.height = val,
-        PropertyDeclaration::Width(val) => style.width = val,
+    declaration.compute(style);
+}
+
+fn compute_element_style(
+    matching_declaration_blocks: &[&Vec<PropertyDeclaration>],
+    inherited_style: Option<&ComputedStyle>,
+) -> ComputedStyle {
+    let mut style = match inherited_style {
+        Some(s) => s.inherited(),
+        None => ComputedStyle::initial(),
+    };
+
+    // Apply early properties first.
+    for block in matching_declaration_blocks {
+        for declaration in &**block {
+            if declaration.is_early() {
+                apply_declaration(&mut style, declaration);
+            }
+        }
     }
+
+    // Now compute the writing mode, on which late properties may depend on.
+    style.writing_mode = WritingMode::new(
+        style.direction,
+        style.computed_writing_mode,
+        style.text_orientation,
+    );
+
+    // Now apply the late properties.
+    for block in matching_declaration_blocks {
+        for declaration in &**block {
+            if !declaration.is_early() {
+                apply_declaration(&mut style, declaration);
+            }
+        }
+    }
+
+    // Done!
+    style.finish(inherited_style.is_none())
 }
 
 fn compute_styles_for_tree(
@@ -240,30 +443,26 @@ fn compute_styles_for_tree(
         }
     };
 
-    let mut style = match inherited_style {
-        Some(s) => s.inherited(),
-        None => ComputedStyle::initial(),
-    };
+    let mut matching_declaration_blocks = Vec::new();
 
     for rule in rules {
         if rule.original_rule.selectors.0[rule.selector_index].matches(&element) {
-            for declaration in &rule.original_rule.declarations {
-                apply_declaration(&mut style, declaration);
-            }
+            matching_declaration_blocks.push(&rule.original_rule.declarations);
         }
     }
 
-    if let Some(style_attr) = element.attributes.borrow().get("style") {
+    let style_attr = element.attributes.borrow().get("style").and_then(|style_attr| {
         let mut input = ParserInput::new(style_attr);
         let mut input = Parser::new(&mut input);
-        if let Ok(declarations) = parse_declarations(&mut input) {
-            for ref declaration in declarations {
-                apply_declaration(&mut style, declaration);
-            }
-        }
+        parse_declarations(&mut input).ok()
+    });
+
+    if let Some(ref s) = style_attr {
+        matching_declaration_blocks.push(s);
     }
 
-    let style = style.finish(inherited_style.is_none());
+    let style = compute_element_style(&matching_declaration_blocks, inherited_style);
+
     for child in node.children() {
         compute_styles_for_tree(&child, rules, Some(&style), map);
     }

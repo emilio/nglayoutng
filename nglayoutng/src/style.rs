@@ -2,7 +2,7 @@ use app_units::Au;
 use euclid::{Size2D, SideOffsets2D};
 use logical_geometry::{self, LogicalSize, LogicalMargin};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
 pub enum Display {
     None,
     Contents,
@@ -22,7 +22,13 @@ impl Display {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
+pub enum BoxSizing {
+    ContentBox,
+    BorderBox,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
 pub enum Position {
     Static,
     Absolute,
@@ -43,20 +49,28 @@ impl Position {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
 pub enum Direction {
     Ltr,
     Rtl,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
 pub enum Float {
     Left,
     Right,
     None,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
+pub enum Overflow {
+    Visible,
+    Hidden,
+    Scroll,
+    Auto,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
 pub enum Clear {
     None,
     Left,
@@ -64,7 +78,21 @@ pub enum Clear {
     Both,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
+pub enum BorderStyle {
+    None,
+    Solid,
+    Double,
+    Dotted,
+    Dashed,
+    Hidden,
+    Groove,
+    Ridge,
+    Inset,
+    Outset,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
 pub enum WritingMode {
     HorizontalTb,
     VerticalRl,
@@ -73,7 +101,7 @@ pub enum WritingMode {
     SidewaysLr,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
 pub enum TextOrientation {
     Mixed,
     Upright,
@@ -124,8 +152,11 @@ pub struct MutableComputedStyle {
     pub original_display: Display,
     pub computed_writing_mode: WritingMode,
     pub position: Position,
+    pub box_sizing: BoxSizing,
     pub float: Float,
     pub clear: Clear,
+    pub overflow_x: Overflow,
+    pub overflow_y: Overflow,
     pub direction: Direction,
     pub text_orientation: TextOrientation,
 
@@ -137,15 +168,20 @@ pub struct MutableComputedStyle {
     pub padding_bottom: LengthPercentage,
     pub padding_left: LengthPercentage,
 
-    pub margin_top: LengthPercentage,
-    pub margin_right: LengthPercentage,
-    pub margin_bottom: LengthPercentage,
-    pub margin_left: LengthPercentage,
+    pub margin_top: LengthPercentageOrAuto,
+    pub margin_right: LengthPercentageOrAuto,
+    pub margin_bottom: LengthPercentageOrAuto,
+    pub margin_left: LengthPercentageOrAuto,
 
     pub border_top_width: LengthPercentage,
     pub border_right_width: LengthPercentage,
     pub border_bottom_width: LengthPercentage,
     pub border_left_width: LengthPercentage,
+
+    pub border_top_style: BorderStyle,
+    pub border_right_style: BorderStyle,
+    pub border_bottom_style: BorderStyle,
+    pub border_left_style: BorderStyle,
 
     pub top: LengthPercentage,
     pub right: LengthPercentage,
@@ -206,8 +242,11 @@ impl ComputedStyle {
             display: Display::Inline,
             original_display: Display::Inline,
             position: Position::Static,
+            box_sizing: BoxSizing::ContentBox,
             float: Float::None,
             clear: Clear::None,
+            overflow_x: Overflow::Visible,
+            overflow_y: Overflow::Visible,
 
             width: Default::default(),
             height: Default::default(),
@@ -226,6 +265,11 @@ impl ComputedStyle {
             border_right_width: Default::default(),
             border_bottom_width: Default::default(),
             border_left_width: Default::default(),
+
+            border_top_style: BorderStyle::None,
+            border_right_style: BorderStyle::None,
+            border_bottom_style: BorderStyle::None,
+            border_left_style: BorderStyle::None,
 
             top: Default::default(),
             right: Default::default(),
@@ -263,7 +307,7 @@ impl ComputedStyle {
         )
     }
 
-    fn physical_margin(&self) -> SideOffsets2D<LengthPercentage> {
+    fn physical_margin(&self) -> SideOffsets2D<LengthPercentageOrAuto> {
         SideOffsets2D::new(
             self.margin_top,
             self.margin_right,
@@ -292,7 +336,7 @@ impl ComputedStyle {
         LogicalSize::from_physical(self.writing_mode, self.physical_size())
     }
 
-    pub fn margin(&self) -> LogicalMargin<LengthPercentage> {
+    pub fn margin(&self) -> LogicalMargin<LengthPercentageOrAuto> {
         LogicalMargin::from_physical(self.writing_mode, self.physical_margin())
     }
 
