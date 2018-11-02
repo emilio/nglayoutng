@@ -346,7 +346,7 @@ pub fn parse_declarations<'i>(input: &mut Parser<'i, '_>) -> Result<Vec<Property
     Ok(declarations)
 }
 
-pub fn parse_css<'i>(css: &'i str) -> Result<Vec<Rule>, (ParseError<'i>, &'i str)> {
+pub fn parse_css<'i>(css: &'i str) -> Vec<Rule> {
     let mut input = ParserInput::new(css);
     let mut input = Parser::new(&mut input);
 
@@ -354,7 +354,14 @@ pub fn parse_css<'i>(css: &'i str) -> Result<Vec<Rule>, (ParseError<'i>, &'i str
     let mut css_rules = Vec::new();
 
     for result in iter {
-        css_rules.push(Rc::new(result?));
+        let rule = match result {
+            Ok(r) => r,
+            Err((error, string)) => {
+                eprintln!("Rule dropped: {:?}, {:?}", error, string);
+                continue;
+            }
+        };
+        css_rules.push(Rc::new(rule));
     }
 
     // Now sort each selector by (specificity, source_order).
@@ -373,7 +380,7 @@ pub fn parse_css<'i>(css: &'i str) -> Result<Vec<Rule>, (ParseError<'i>, &'i str
 
     rules.sort_by_key(|rule| (rule.specificity, rule.source_order));
 
-    Ok(rules)
+    rules
 }
 
 /// A map with styles from each element to its style.

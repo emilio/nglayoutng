@@ -1,0 +1,17 @@
+article, aside, details,
+div, dt, figcaption, footer,
+form, header, hgroup, html,
+main, nav, section, summary {
+  display: block;
+}
+
+body {
+  display: block;
+  margin: 8px;
+}
+
+p, dl {
+  display: block;
+  margin-block-start: 16px;
+  margin-block-end: 16px;
+}

@@ -56,9 +56,18 @@ pub struct InsertionPoint {
 
 impl LayoutTreeBuilder {
     pub fn new(input: &mut impl Read) -> io::Result<Self> {
+        use std::fs;
+        use std::path::Path;
+
         let dom = dom::build_dom(input)?;
         let css = dom::read_stylesheets(&dom);
-        let style_rules = css::parse_css(&css).expect("Invalid CSS");
+
+        let ua_sheet = fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join("css").join("res").join("ua.css")
+        )?;
+
+        let mut style_rules = css::parse_css(&ua_sheet);
+        style_rules.extend(css::parse_css(&css));
         let styles = css::compute_styles(&dom, &style_rules);
         Ok(Self {
             dom,
