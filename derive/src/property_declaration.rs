@@ -138,9 +138,7 @@ pub fn derive(input: DeriveInput) -> Tokens {
                     #parse_body
                     _ => {
                         Err(location.new_custom_error(
-                            ::layout_tree::builder::css::Error::UnknownPropertyName(
-                                name.clone(),
-                            )
+                            ::css::Error::UnknownPropertyName(name.clone())
                         ))
                     }
                 }

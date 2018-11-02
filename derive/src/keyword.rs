@@ -54,7 +54,7 @@ pub fn derive(input: DeriveInput) -> Tokens {
             #[inline]
             pub fn parse<'i, 't>(
                 input: &mut ::cssparser::Parser<'i, 't>,
-            ) -> Result<Self, ::layout_tree::builder::css::ParseError<'i>> {
+            ) -> Result<Self, ::css::ParseError<'i>> {
                 let location = input.current_source_location();
                 let ident = input.expect_ident()?;
                 Self::from_ident(ident.as_ref()).map_err(|()| {

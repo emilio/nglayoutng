@@ -1,7 +1,7 @@
-mod dom;
-pub mod css;
 
 use app_units::Au;
+use css;
+use dom;
 use euclid::Size2D;
 use super::{LayoutTree, LayoutNodeId, LayoutNode, LayoutNodeKind, ContainerKind, LeafKind};
 use style::{self, ComputedStyle};
