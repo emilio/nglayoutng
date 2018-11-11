@@ -55,8 +55,8 @@ fn compare_with_reference(
     File::create(&dom_expectations).unwrap().write_all(dom.as_bytes()).unwrap();
     File::create(&layout_expectations).unwrap().write_all(layout.as_bytes()).unwrap();
 
-    print_diff(&dom, &expected_dom, "DOM deferred");
-    print_diff(&layout, &expected_layout, "DOM deferred");
+    print_diff(&dom, &expected_dom, "DOM differed");
+    print_diff(&layout, &expected_layout, "DOM differed");
 
     panic!("Expectation and test mismatch!");
 }
