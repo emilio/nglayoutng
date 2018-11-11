@@ -15,3 +15,9 @@ p, dl {
   margin-block-start: 16px;
   margin-block-end: 16px;
 }
+
+/* hidden elements */
+base, basefont, datalist, head, meta, script, style, title,
+noembed, param, template {
+   display: none;
+}

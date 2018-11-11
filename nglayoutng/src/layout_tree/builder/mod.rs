@@ -47,6 +47,7 @@ pub struct LayoutTreeBuilder {
 pub struct LayoutTreeBuilderResult {
     pub principal_boxes: PrincipalBoxes,
     pub layout_tree: LayoutTree,
+    pub dom: NodeRef,
 }
 
 pub struct InsertionPoint {
@@ -89,6 +90,7 @@ impl LayoutTreeBuilder {
         LayoutTreeBuilderResult {
             layout_tree: self.layout_tree,
             principal_boxes: self.principal_boxes,
+            dom: self.dom,
         }
     }
 

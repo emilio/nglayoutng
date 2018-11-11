@@ -1,0 +1,13 @@
+┌ DOM tree
+│  ├─ #document
+│  │  ├─ <!DOCTYPE html  >
+│  │  ├─ <html>
+│  │  │  ├─ <head>
+│  │  │  ├─ <body>
+│  │  │  │  ├─ <div>
+│  │  │  │  │  ├─ #text "\n"
+│  │  │  │  │  ├─ <div>
+│  │  │  │  │  │  ├─ <span>
+│  │  │  │  │  ├─ #text "\n"
+│  │  │  │  │  ├─ <div>
+│  │  │  │  │  ├─ #text "\n"

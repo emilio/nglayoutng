@@ -4,6 +4,7 @@
 use html5ever::LocalName;
 use kuchiki::{self, NodeData, NodeRef};
 use kuchiki::traits::*;
+use misc::print_tree::PrintTree;
 use std::io::{self, Read};
 
 /// Parses a DOM tree using html5ever and returns the root.
@@ -14,6 +15,44 @@ where
     kuchiki::parse_html()
         .from_utf8()
         .read_from(input)
+}
+
+fn print_node(node: &NodeRef, print: &mut PrintTree) {
+    print.new_level(match node.data() {
+        NodeData::Document(..) => "#document".into(),
+        NodeData::DocumentFragment => "#document-fragment".into(),
+        NodeData::Comment(ref comment) => format!("<!-- {} -->", comment.borrow()),
+        NodeData::ProcessingInstruction(ref content) => {
+            let content = content.borrow();
+            format!("<?{} {}?>", content.0, content.1)
+        },
+        NodeData::Doctype(ref doctype) => {
+            format!("<!DOCTYPE {} {} {}>", doctype.name, doctype.public_id, doctype.system_id)
+        },
+        NodeData::Text(ref text) => {
+            format!("#text {:?}", text.borrow())
+        },
+        NodeData::Element(ref element) => {
+            format!("<{}>", element.name.local)
+        }
+    });
+
+    for child in node.children() {
+        print_node(&child, print);
+    }
+
+    print.end_level();
+}
+
+/// Prints the dom to stderr.
+pub fn print_dom(root: &NodeRef) {
+    print_dom_to(root, &mut std::io::stdout());
+}
+
+/// Prints the dom to a particular output.
+pub fn print_dom_to(root: &NodeRef, dest: &mut ::std::io::Write) {
+    let mut tree = PrintTree::new("DOM tree", dest);
+    print_node(root, &mut tree);
 }
 
 /// Reads all the style sheets in the DOM and returns a CSS string with the

@@ -6,6 +6,7 @@ use euclid::Size2D;
 use logical_geometry;
 use self::builder::InsertionPoint;
 use style::{self, ComputedStyle};
+use misc::print_tree::PrintTree;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct LayoutNodeId(usize);
@@ -61,6 +62,21 @@ impl LayoutNode {
         }
     }
 
+    fn print(&self, tree: &LayoutTree, printer: &mut PrintTree) {
+        printer.new_level(match self.kind {
+            LayoutNodeKind::Container { ref kind, .. } => {
+                format!("{:?}", kind)
+            }
+            LayoutNodeKind::Leaf { ref kind } => {
+                format!("{:?}", kind)
+            }
+        });
+        for child in self.children(tree) {
+            child.print(tree, printer);
+        }
+        printer.end_level();
+    }
+
     pub fn new_leaf(style: ComputedStyle, kind: LeafKind) -> Self {
         Self::new(style, LayoutNodeKind::Leaf { kind })
     }
@@ -109,6 +125,53 @@ impl LayoutNode {
 
     pub fn parent(&self) -> Option<LayoutNodeId> {
         self.parent
+    }
+
+    pub fn children<'tree>(
+        &self,
+        tree: &'tree LayoutTree,
+    ) -> impl Iterator<Item = &'tree LayoutNode> {
+        Children {
+            current: self.first_child(),
+            tree,
+            get_next: |node| node.next_sibling(),
+        }
+    }
+
+    pub fn rev_children<'tree>(
+        &self,
+        tree: &'tree LayoutTree,
+    ) -> impl Iterator<Item = &'tree LayoutNode> {
+        Children {
+            current: self.first_child(),
+            tree,
+            get_next: |node| node.prev_sibling(),
+        }
+    }
+}
+
+/// An iterator over all the children of a node.
+pub struct Children<'a, F>
+where
+    F: Fn(&LayoutNode) -> Option<LayoutNodeId>,
+{
+    tree: &'a LayoutTree,
+    current: Option<LayoutNodeId>,
+    get_next: F,
+}
+
+impl<'a, F> Iterator for Children<'a, F>
+where
+    F: Fn(&LayoutNode) -> Option<LayoutNodeId>,
+{
+    type Item = &'a LayoutNode;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let current = self.current.take()?;
+        let current = &self.tree[current];
+        let next = (self.get_next)(current);
+        self.current = next;
+        Some(current)
     }
 }
 
@@ -250,6 +313,17 @@ impl LayoutTree {
             child = self[child_to_remove].next_sibling();
             self.destroy(child_to_remove);
         }
+    }
+
+    /// Prints the layout tree to stdout.
+    pub fn print(&self) {
+        self.print_to(&mut ::std::io::stdout());
+    }
+
+    /// Prints the layout tree to a particular output.
+    pub fn print_to(&self, dest: &mut ::std::io::Write) {
+        let mut printer = PrintTree::new("Layout tree", dest);
+        self[self.root].print(self, &mut printer);
     }
 }
 

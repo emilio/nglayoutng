@@ -12,3 +12,6 @@ kuchiki = "0.7"
 html5ever = "0.22"
 cssparser = "0.24"
 nglayoutng_derive = { path = "../derive" }
+
+[dev-dependencies]
+diff = "0.1"

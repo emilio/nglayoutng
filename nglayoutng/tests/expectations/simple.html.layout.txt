@@ -1,0 +1,8 @@
+┌ Layout tree
+│  ├─ Viewport
+│  │  ├─ Block
+│  │  │  ├─ Block
+│  │  │  │  ├─ Block
+│  │  │  │  │  ├─ Text { text: "\n  My parent is a block.\n  " }
+│  │  │  │  │  ├─ Inline
+│  │  │  │  │  │  ├─ Text { text: "\n    And mine is an inline.\n" }
