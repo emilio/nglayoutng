@@ -1,12 +1,14 @@
 use app_units::Au;
 use euclid::{Size2D, SideOffsets2D};
 use logical_geometry::{self, LogicalSize, LogicalMargin};
+use cssparser::{Color, RGBA};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
 pub enum Display {
     None,
     Contents,
     Block,
+    FlowRoot,
     Inline,
     // ..
 }
@@ -15,6 +17,7 @@ impl Display {
     fn blockify(self) -> Self {
         match self {
             Display::Block |
+            Display::FlowRoot |
             Display::None |
             Display::Contents => self,
             Display::Inline => Display::Block,
@@ -160,6 +163,9 @@ pub struct MutableComputedStyle {
     pub direction: Direction,
     pub text_orientation: TextOrientation,
 
+    pub color: RGBA,
+    pub background_color: Color,
+
     pub width: LengthPercentageOrAuto,
     pub height: LengthPercentageOrAuto,
 
@@ -173,15 +179,20 @@ pub struct MutableComputedStyle {
     pub margin_bottom: LengthPercentageOrAuto,
     pub margin_left: LengthPercentageOrAuto,
 
-    pub border_top_width: LengthPercentage,
-    pub border_right_width: LengthPercentage,
-    pub border_bottom_width: LengthPercentage,
-    pub border_left_width: LengthPercentage,
+    pub border_top_width: Length,
+    pub border_right_width: Length,
+    pub border_bottom_width: Length,
+    pub border_left_width: Length,
 
     pub border_top_style: BorderStyle,
     pub border_right_style: BorderStyle,
     pub border_bottom_style: BorderStyle,
     pub border_left_style: BorderStyle,
+
+    pub border_top_color: Color,
+    pub border_right_color: Color,
+    pub border_bottom_color: Color,
+    pub border_left_color: Color,
 
     pub top: LengthPercentage,
     pub right: LengthPercentage,
@@ -231,6 +242,8 @@ impl ComputedStyle {
 
         MutableComputedStyle {
             pseudo: None,
+            color: RGBA::new(0, 0, 0, 255),
+            background_color: Color::RGBA(RGBA::transparent()),
             writing_mode: logical_geometry::WritingMode::new(
                 direction,
                 writing_mode,
@@ -271,6 +284,11 @@ impl ComputedStyle {
             border_bottom_style: BorderStyle::None,
             border_left_style: BorderStyle::None,
 
+            border_top_color: Color::CurrentColor,
+            border_right_color: Color::CurrentColor,
+            border_bottom_color: Color::CurrentColor,
+            border_left_color: Color::CurrentColor,
+
             top: Default::default(),
             right: Default::default(),
             bottom: Default::default(),
@@ -284,6 +302,7 @@ impl ComputedStyle {
             writing_mode: self.writing_mode,
             text_orientation: self.text_orientation,
             computed_writing_mode: self.computed_writing_mode,
+            color: self.color,
             .. Self::initial()
         }
     }
@@ -316,7 +335,7 @@ impl ComputedStyle {
         )
     }
 
-    fn physical_border_widths(&self) -> SideOffsets2D<LengthPercentage> {
+    fn physical_border_widths(&self) -> SideOffsets2D<Length> {
         SideOffsets2D::new(
             self.border_top_width,
             self.border_right_width,
@@ -344,7 +363,7 @@ impl ComputedStyle {
         LogicalMargin::from_physical(self.writing_mode, self.physical_padding())
     }
 
-    pub fn border_widths(&self) -> LogicalMargin<LengthPercentage> {
+    pub fn border_widths(&self) -> LogicalMargin<Length> {
         LogicalMargin::from_physical(self.writing_mode, self.physical_border_widths())
     }
 }

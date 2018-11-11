@@ -22,6 +22,9 @@ pub enum PropertyDeclaration {
     #[declaration(early)]
     TextOrientation(style::TextOrientation),
 
+    Color(cssparser::RGBA),
+    BackgroundColor(cssparser::Color),
+
     Width(style::LengthPercentageOrAuto),
     Height(style::LengthPercentageOrAuto),
 
@@ -58,19 +61,47 @@ pub enum PropertyDeclaration {
     #[declaration(logical)]
     PaddingInlineEnd(style::LengthPercentage),
 
-    BorderTopWidth(style::LengthPercentage),
-    BorderBottomWidth(style::LengthPercentage),
-    BorderLeftWidth(style::LengthPercentage),
-    BorderRightWidth(style::LengthPercentage),
+    BorderTopWidth(style::Length),
+    BorderBottomWidth(style::Length),
+    BorderLeftWidth(style::Length),
+    BorderRightWidth(style::Length),
 
     #[declaration(logical)]
-    BorderBlockStartWidth(style::LengthPercentage),
+    BorderBlockStartWidth(style::Length),
     #[declaration(logical)]
-    BorderBlockEndWidth(style::LengthPercentage),
+    BorderBlockEndWidth(style::Length),
     #[declaration(logical)]
-    BorderInlineStartWidth(style::LengthPercentage),
+    BorderInlineStartWidth(style::Length),
     #[declaration(logical)]
-    BorderInlineEndWidth(style::LengthPercentage),
+    BorderInlineEndWidth(style::Length),
+
+    BorderTopColor(cssparser::Color),
+    BorderBottomColor(cssparser::Color),
+    BorderLeftColor(cssparser::Color),
+    BorderRightColor(cssparser::Color),
+
+    #[declaration(logical)]
+    BorderBlockStartColor(cssparser::Color),
+    #[declaration(logical)]
+    BorderBlockEndColor(cssparser::Color),
+    #[declaration(logical)]
+    BorderInlineStartColor(cssparser::Color),
+    #[declaration(logical)]
+    BorderInlineEndColor(cssparser::Color),
+
+    BorderTopStyle(style::BorderStyle),
+    BorderBottomStyle(style::BorderStyle),
+    BorderLeftStyle(style::BorderStyle),
+    BorderRightStyle(style::BorderStyle),
+
+    #[declaration(logical)]
+    BorderBlockStartStyle(style::BorderStyle),
+    #[declaration(logical)]
+    BorderBlockEndStyle(style::BorderStyle),
+    #[declaration(logical)]
+    BorderInlineStartStyle(style::BorderStyle),
+    #[declaration(logical)]
+    BorderInlineEndStyle(style::BorderStyle),
 
     Display(style::Display),
     Position(style::Position),
@@ -101,6 +132,8 @@ pub struct Rule {
 #[derive(Debug)]
 pub enum Error<'i> {
     InvalidSelector,
+    CurrentColorInColor,
+    EmptyBorder,
     UnknownPropertyName(CowRcStr<'i>),
     UnknownLengthUnit(CowRcStr<'i>),
 }
@@ -156,6 +189,20 @@ fn length_from_dimension(
         return Err(());
     }
     Ok(style::Length(Au::from_f32_px(value)))
+}
+
+fn parse_color<'i>(input: &mut Parser<'i, '_>) -> Result<cssparser::Color, ParseError<'i>> {
+    Ok(cssparser::Color::parse(input)?)
+}
+
+fn parse_rgba<'i>(input: &mut Parser<'i, '_>) -> Result<cssparser::RGBA, ParseError<'i>> {
+    let color = parse_color(input)?;
+    match color {
+        cssparser::Color::RGBA(rgba) => Ok(rgba),
+        cssparser::Color::CurrentColor => {
+            Err(input.new_custom_error(Error::CurrentColorInColor))
+        }
+    }
 }
 
 fn parse_length<'i>(input: &mut Parser<'i, '_>) -> Result<style::Length, ParseError<'i>> {
@@ -222,6 +269,64 @@ fn parse_overflow_shorthand<'i>(
     ret.push(PropertyDeclaration::OverflowY(y));
     Ok(ret)
 }
+
+fn parse_border<'i>(
+    input: &mut Parser<'i, '_>,
+) -> Result<SmallVec<[PropertyDeclaration; 1]>, ParseError<'i>> {
+    let mut color = None;
+    let mut style = None;
+    let mut width = None;
+    let mut any = false;
+    loop {
+        if color.is_none() {
+            if let Ok(value) = input.try(parse_color) {
+                color = Some(value);
+                any = true;
+                continue
+            }
+        }
+        if style.is_none() {
+            if let Ok(value) = input.try(style::BorderStyle::parse) {
+                style = Some(value);
+                any = true;
+                continue
+            }
+        }
+        if width.is_none() {
+            if let Ok(value) = input.try(parse_length) {
+                width = Some(value);
+                any = true;
+                continue
+            }
+        }
+        break
+    }
+    if !any {
+        return Err(input.new_custom_error(Error::EmptyBorder))
+    }
+    let mut ret = SmallVec::new();
+    let color = color.unwrap_or(cssparser::Color::CurrentColor);
+    let style = style.unwrap_or(style::BorderStyle::None);
+    let width = width.unwrap_or(style::Length(Au::from_f32_px(3.)));
+
+    ret.push(PropertyDeclaration::BorderTopColor(color));
+    ret.push(PropertyDeclaration::BorderRightColor(color));
+    ret.push(PropertyDeclaration::BorderBottomColor(color));
+    ret.push(PropertyDeclaration::BorderLeftColor(color));
+
+    ret.push(PropertyDeclaration::BorderTopStyle(style));
+    ret.push(PropertyDeclaration::BorderRightStyle(style));
+    ret.push(PropertyDeclaration::BorderBottomStyle(style));
+    ret.push(PropertyDeclaration::BorderLeftStyle(style));
+
+    ret.push(PropertyDeclaration::BorderTopWidth(width));
+    ret.push(PropertyDeclaration::BorderRightWidth(width));
+    ret.push(PropertyDeclaration::BorderBottomWidth(width));
+    ret.push(PropertyDeclaration::BorderLeftWidth(width));
+
+    Ok(ret)
+}
+
 
 fn parse_four_sides<'i, L>(
     input: &mut Parser<'i, '_>,
@@ -313,8 +418,25 @@ impl<'i> cssparser::DeclarationParser<'i> for PropertyDeclarationParser {
                 PropertyDeclaration::BorderRightWidth,
                 PropertyDeclaration::BorderBottomWidth,
                 PropertyDeclaration::BorderLeftWidth,
-                parse_length_or_percentage,
+                parse_length,
             ),
+            "border-style" => parse_four_sides(
+                input,
+                PropertyDeclaration::BorderTopStyle,
+                PropertyDeclaration::BorderRightStyle,
+                PropertyDeclaration::BorderBottomStyle,
+                PropertyDeclaration::BorderLeftStyle,
+                style::BorderStyle::parse,
+            ),
+            "border-color" => parse_four_sides(
+                input,
+                PropertyDeclaration::BorderTopColor,
+                PropertyDeclaration::BorderRightColor,
+                PropertyDeclaration::BorderBottomColor,
+                PropertyDeclaration::BorderLeftColor,
+                parse_color,
+            ),
+            "border" => parse_border(input),
             "overflow" => parse_overflow_shorthand(input),
             _ => Err(input.new_custom_error(Error::UnknownPropertyName(name.clone()))),
         }

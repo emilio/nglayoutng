@@ -102,6 +102,8 @@ pub fn derive(input: DeriveInput) -> Tokens {
             "LengthPercentageOrAuto" => "parse_length_or_percentage_or_auto",
             "Length" => "parse_length",
             "Percentage" => "parse_percentage",
+            "Color" => "parse_color",
+            "RGBA" => "parse_rgba",
             _ => return None,
         }))
     }

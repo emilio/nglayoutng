@@ -251,6 +251,7 @@ impl LayoutTreeBuilder {
         let container_kind = match style.display {
             style::Display::None |
             style::Display::Contents => unreachable!(),
+            style::Display::FlowRoot |
             style::Display::Block => ContainerKind::Block,
             style::Display::Inline => ContainerKind::Inline,
         };
