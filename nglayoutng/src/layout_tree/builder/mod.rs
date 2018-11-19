@@ -3,7 +3,7 @@ use app_units::Au;
 use css;
 use dom;
 use euclid::Size2D;
-use style::{self, ComputedStyle};
+use style::{ComputedStyle, Display};
 
 use kuchiki::{self, NodeData, NodeRef};
 
@@ -116,7 +116,7 @@ impl LayoutTreeBuilder {
             let layout_parent = match self.principal_boxes.for_node(&dom_parent) {
                 Some(node) => *node,
                 None => {
-                    if self.styles.for_node(&dom_parent)?.display != style::Display::Contents {
+                    if self.styles.for_node(&dom_parent)?.display != Display::Contents {
                         return None;
                     }
                     dom_parent = dom_parent.parent()?;
@@ -138,7 +138,7 @@ impl LayoutTreeBuilder {
                 return Some(*node);
             }
             if let Some(style) = self.styles.for_node(&node) {
-                if style.display == style::Display::Contents {
+                if style.display == Display::Contents {
                     if let Some(last) = node.last_child() {
                         // Drill down if possible.
                         if let Some(kid) = self.find_insertion_prev_sibling(last) {
@@ -162,7 +162,7 @@ impl LayoutTreeBuilder {
         // parents.
         let mut parent = node.parent()?;
         loop {
-            if self.styles.for_node(&parent)?.display != style::Display::Contents {
+            if self.styles.for_node(&parent)?.display != Display::Contents {
                 return None;
             }
             if let Some(prev_sibling) = parent.previous_sibling() {
@@ -211,7 +211,7 @@ impl LayoutTreeBuilder {
         let new_box = match self.construct_box_for(node, style, &insertion_point) {
             Some(node) => node,
             None => {
-                if style.display == style::Display::Contents {
+                if style.display == Display::Contents {
                     self.insert_node_children(node);
                 }
                 return;
@@ -231,7 +231,7 @@ impl LayoutTreeBuilder {
         style: &ComputedStyle,
         _insertion_point: &InsertionPoint,
     ) -> Option<LayoutNode> {
-        if style.display == style::Display::None || style.display == style::Display::Contents {
+        if style.display == Display::None || style.display == Display::Contents {
             return None;
         }
 
@@ -254,9 +254,9 @@ impl LayoutTreeBuilder {
         }
 
         let container_kind = match style.display {
-            style::Display::None | style::Display::Contents => unreachable!(),
-            style::Display::FlowRoot | style::Display::Block => ContainerKind::Block,
-            style::Display::Inline => ContainerKind::Inline,
+            Display::None | Display::Contents => unreachable!(),
+            Display::FlowRoot | Display::Block | Display::InlineBlock => ContainerKind::Block,
+            Display::Inline => ContainerKind::Inline,
         };
         Some(LayoutNode::new_container(style.clone(), container_kind))
     }

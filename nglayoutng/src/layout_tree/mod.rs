@@ -6,7 +6,7 @@ use app_units::Au;
 use euclid::Size2D;
 use logical_geometry;
 use misc::print_tree::PrintTree;
-use style::{self, ComputedStyle};
+use style::{self, ComputedStyle, Display};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct LayoutNodeId(usize);
@@ -71,6 +71,64 @@ impl LayoutNode {
         }
     }
 
+    /// https://drafts.csswg.org/css2/visuren.html#block-formatting
+    ///
+    /// > Floats, absolutely positioned elements, block containers (such as
+    /// > inline-blocks, table-cells, and table-captions) that are not block
+    /// > boxes, and block boxes with 'overflow' other than 'visible' (except
+    /// > when that value has been propagated to the viewport) establish new
+    /// > block formatting contexts for their contents.
+    pub fn establishes_bfc(&self) -> bool {
+        use style::Overflow;
+
+        // The root always establishes an (initial) BFC.
+        if self.parent.is_none() {
+            return true;
+        }
+
+        if self.style.is_floating() || self.style.is_out_of_flow_positioned() {
+            return true;
+        }
+
+        // These always stablish a new bfc.
+        let display = self.display();
+        if display == Display::InlineBlock || display == Display::FlowRoot {
+            return true;
+        }
+
+        // Style guarantees that for the Visible case, overflow-x is equal to
+        // overflow-y.
+        //
+        // TODO: Maybe implement the 'has been propagated to the viewport'
+        // thing.
+        if display.is_block_outside() && self.style.overflow_x != Overflow::Visible {
+            return true;
+        }
+
+        // TODO(emilio): Columns and such, step by step...
+        false
+    }
+
+    /// Returns whether this box establishes an inline formatting context.
+    ///
+    /// We only need to check the first child because we can't have both
+    /// block-level and inline-level children in the same formatting context.
+    ///
+    /// FIXME: That's not enforced right now, but should be (need to deal with
+    /// IB splits properly somehow).
+    pub fn establishes_ifc(&self, tree: &LayoutTree) -> bool {
+        let display = self.display();
+        if !display.is_block_outside() && display != Display::InlineBlock {
+            return false;
+        }
+
+        match self.children(tree).next() {
+            // TODO: Is checking display: inline enough here?
+            Some(c) => c.display() == Display::Inline,
+            None => false,
+        }
+    }
+
     fn print(&self, tree: &LayoutTree, printer: &mut PrintTree) {
         printer.new_level(match self.kind {
             LayoutNodeKind::Container { ref kind, .. } => format!("{:?}", kind),
@@ -97,7 +155,7 @@ impl LayoutNode {
         )
     }
 
-    pub fn display(&self) -> style::Display {
+    pub fn display(&self) -> Display {
         self.style.display
     }
 

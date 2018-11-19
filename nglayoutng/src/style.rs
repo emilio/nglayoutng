@@ -10,14 +10,29 @@ pub enum Display {
     Block,
     FlowRoot,
     Inline,
+    InlineBlock,
     // ..
 }
 
 impl Display {
+    pub fn is_block_outside(self) -> bool {
+        match self {
+            Display::Block | Display::FlowRoot => true,
+            Display::None | Display::Contents | Display::InlineBlock | Display::Inline => false,
+        }
+    }
+
+    pub fn is_inline_outside(self) -> bool {
+        match self {
+            Display::None | Display::Contents | Display::Block | Display::FlowRoot => false,
+            Display::InlineBlock | Display::Inline => true,
+        }
+    }
+
     fn blockify(self) -> Self {
         match self {
             Display::Block | Display::FlowRoot | Display::None | Display::Contents => self,
-            Display::Inline => Display::Block,
+            Display::InlineBlock | Display::Inline => Display::Block,
         }
     }
 }
@@ -198,9 +213,21 @@ impl MutableComputedStyle {
     /// Finish mutating this style.
     pub fn finish(mut self, is_root_element: bool) -> ComputedStyle {
         self.original_display = self.display;
+
+        if self.overflow_x != self.overflow_y {
+            if self.overflow_x == Overflow::Visible {
+                self.overflow_y = Overflow::Auto;
+            }
+            if self.overflow_y == Overflow::Visible {
+                self.overflow_x = Overflow::Auto;
+            }
+        }
+
+        // FIXME(emilio): Blockify flex items and such.
         if self.is_floating() || self.is_out_of_flow() || is_root_element {
             self.display = self.display.blockify();
         }
+
         ComputedStyle(self)
     }
 }
@@ -221,6 +248,10 @@ impl ::std::ops::Deref for ComputedStyle {
 impl MutableComputedStyle {
     pub fn is_floating(&self) -> bool {
         self.float != Float::None
+    }
+
+    pub fn is_out_of_flow_positioned(&self) -> bool {
+        self.position.is_out_of_flow()
     }
 
     pub fn is_out_of_flow(&self) -> bool {
