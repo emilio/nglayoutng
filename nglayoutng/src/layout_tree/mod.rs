@@ -125,31 +125,25 @@ impl LayoutNode {
         false
     }
 
-    /// Returns whether this box establishes an inline formatting context.
-    ///
-    /// We only need to check the first in-flow child because we can't have both
-    /// block-level and inline-level children in the same formatting context.
-    ///
-    /// FIXME: That's not enforced right now, but should be (need to deal with
-    /// IB splits properly somehow).
-    pub fn establishes_ifc(&self, tree: &LayoutTree) -> bool {
-        let display = self.display();
-        if !display.is_block_outside() && display != Display::InlineBlock {
-            return false;
+    fn print_label(&self, tree: &LayoutTree) -> String {
+        let mut label = match self.kind {
+            LayoutNodeKind::Container { ref kind, .. } => format!("{:?}", kind),
+            LayoutNodeKind::Leaf { ref kind } => format!("{:?}", kind),
+        };
+
+        if self.is_out_of_flow() {
+            label.push_str(" (oof)");
         }
 
-        match self.in_flow_children(tree).next() {
-            // TODO: Is checking display: inline enough here?
-            Some(c) => c.display() == Display::Inline,
-            None => false,
+        if self.establishes_bfc() {
+            label.push_str(" (bfc)");
         }
+
+        label
     }
 
     fn print(&self, tree: &LayoutTree, printer: &mut PrintTree) {
-        printer.new_level(match self.kind {
-            LayoutNodeKind::Container { ref kind, .. } => format!("{:?}", kind),
-            LayoutNodeKind::Leaf { ref kind } => format!("{:?}", kind),
-        });
+        printer.new_level(self.print_label(tree));
         for child in self.children(tree) {
             child.print(tree, printer);
         }

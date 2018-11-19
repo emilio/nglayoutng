@@ -1,11 +1,11 @@
 ┌ Layout tree
-│  ├─ Viewport
+│  ├─ Viewport (bfc)
 │  │  ├─ Block
 │  │  │  ├─ Block
 │  │  │  │  ├─ Block
 │  │  │  │  │  ├─ Text { text: "\n" }
 │  │  │  │  │  ├─ Block
-│  │  │  │  │  │  ├─ Block
+│  │  │  │  │  │  ├─ Block (oof) (bfc)
 │  │  │  │  │  ├─ Text { text: "\n" }
-│  │  │  │  │  ├─ Block
+│  │  │  │  │  ├─ Block (bfc)
 │  │  │  │  │  ├─ Text { text: "\n" }
