@@ -18,7 +18,9 @@ pub mod dom;
 pub mod css;
 pub mod style;
 pub mod logical_geometry;
+pub mod layout_algorithms;
 pub mod layout_tree;
+pub mod fragment_tree;
 mod misc;
 
 pub use app_units::Au;

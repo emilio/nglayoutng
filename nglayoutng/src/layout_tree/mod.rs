@@ -62,6 +62,13 @@ impl LayoutNode {
         }
     }
 
+    pub fn is_container(&self) -> bool {
+        match self.kind {
+            LayoutNodeKind::Container { .. } => true,
+            LayoutNodeKind::Leaf { .. } => false,
+        }
+    }
+
     fn print(&self, tree: &LayoutTree, printer: &mut PrintTree) {
         printer.new_level(match self.kind {
             LayoutNodeKind::Container { ref kind, .. } => {
