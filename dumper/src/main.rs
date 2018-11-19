@@ -2,8 +2,8 @@
 extern crate clap;
 extern crate nglayoutng;
 
-use nglayoutng::layout_tree::builder::LayoutTreeBuilder;
 use nglayoutng::dom::print_dom;
+use nglayoutng::layout_tree::builder::LayoutTreeBuilder;
 use std::fs::File;
 
 enum DumpKind {
@@ -18,12 +18,12 @@ fn main() {
         .subcommand(
             SubCommand::with_name("layout")
                 .about("Dumps a layout tree from an HTML document")
-                .arg_from_usage("<input>  'The document to build the tree for'")
+                .arg_from_usage("<input>  'The document to build the tree for'"),
         )
         .subcommand(
             SubCommand::with_name("dom")
                 .about("Dumps a DOM tree from an HTML document")
-                .arg_from_usage("<input>  'The document to build the tree for'")
+                .arg_from_usage("<input>  'The document to build the tree for'"),
         )
         .setting(AppSettings::ArgRequiredElseHelp)
         .get_matches();
@@ -41,8 +41,7 @@ fn main() {
 
     let mut file = File::open(input).expect("Couldn't open input file");
 
-    let builder =
-        LayoutTreeBuilder::new(&mut file).expect("Failed to parse input file?");
+    let builder = LayoutTreeBuilder::new(&mut file).expect("Failed to parse input file?");
 
     let result = builder.build();
     match kind {

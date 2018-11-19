@@ -31,7 +31,7 @@ impl<'a> PrintTree<'a> {
     }
 
     fn print_level_prefix(&mut self) {
-        for _ in 0 .. self.level {
+        for _ in 0..self.level {
             write!(self.output, "\u{2502}  ").unwrap();
         }
     }
@@ -48,7 +48,7 @@ impl<'a> PrintTree<'a> {
         self.flush_queued_item("\u{251C}\u{2500}");
 
         self.print_level_prefix();
-        writeln!(self.output,  "\u{251C}\u{2500} {}", title).unwrap();
+        writeln!(self.output, "\u{251C}\u{2500} {}", title).unwrap();
 
         self.level = self.level + 1;
     }

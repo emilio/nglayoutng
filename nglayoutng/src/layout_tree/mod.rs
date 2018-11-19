@@ -1,20 +1,20 @@
 pub mod builder;
 
+use self::builder::InsertionPoint;
 use allocator;
 use app_units::Au;
 use euclid::Size2D;
 use logical_geometry;
-use self::builder::InsertionPoint;
-use style::{self, ComputedStyle};
 use misc::print_tree::PrintTree;
+use style::{self, ComputedStyle};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct LayoutNodeId(usize);
 
 #[derive(Debug)]
 pub enum LeafKind {
-    Text { text: Box<str>, },
-    Replaced { intrinsic_size: Size2D<Au>, }
+    Text { text: Box<str> },
+    Replaced { intrinsic_size: Size2D<Au> },
 }
 
 #[derive(Debug)]
@@ -27,14 +27,16 @@ pub enum ContainerKind {
 
 #[derive(Debug)]
 pub enum LayoutNodeKind {
-    Leaf { kind: LeafKind },
+    Leaf {
+        kind: LeafKind,
+    },
     Container {
         first_child: Option<LayoutNodeId>,
         last_child: Option<LayoutNodeId>,
         // TODO(emilio): Put OOFs parented to me in here? Or collect them during
         // layout?
         kind: ContainerKind,
-    }
+    },
 }
 
 /// A display node is a node in the display tree, which contains the primary box
@@ -71,12 +73,8 @@ impl LayoutNode {
 
     fn print(&self, tree: &LayoutTree, printer: &mut PrintTree) {
         printer.new_level(match self.kind {
-            LayoutNodeKind::Container { ref kind, .. } => {
-                format!("{:?}", kind)
-            }
-            LayoutNodeKind::Leaf { ref kind } => {
-                format!("{:?}", kind)
-            }
+            LayoutNodeKind::Container { ref kind, .. } => format!("{:?}", kind),
+            LayoutNodeKind::Leaf { ref kind } => format!("{:?}", kind),
         });
         for child in self.children(tree) {
             child.print(tree, printer);
@@ -89,11 +87,14 @@ impl LayoutNode {
     }
 
     pub fn new_container(style: ComputedStyle, kind: ContainerKind) -> Self {
-        Self::new(style, LayoutNodeKind::Container {
-            first_child: None,
-            last_child: None,
-            kind,
-        })
+        Self::new(
+            style,
+            LayoutNodeKind::Container {
+                first_child: None,
+                last_child: None,
+                kind,
+            },
+        )
     }
 
     pub fn display(&self) -> style::Display {
@@ -190,37 +191,32 @@ pub struct LayoutTree {
 
 impl LayoutTree {
     pub fn new() -> Self {
-        let root = LayoutNode::new_container(
-            ComputedStyle::for_viewport(),
-            ContainerKind::Viewport,
-        );
+        let root =
+            LayoutNode::new_container(ComputedStyle::for_viewport(), ContainerKind::Viewport);
 
         let mut nodes = allocator::Allocator::default();
         let root = LayoutNodeId(nodes.allocate(root));
 
-        Self {
-            nodes,
-            root,
-        }
+        Self { nodes, root }
     }
 
     pub fn root(&self) -> LayoutNodeId {
         self.root
     }
 
-    pub fn insert(
-        &mut self,
-        mut node: LayoutNode,
-        ip: InsertionPoint,
-    ) -> LayoutNodeId {
+    pub fn insert(&mut self, mut node: LayoutNode, ip: InsertionPoint) -> LayoutNodeId {
         assert!(node.parent.is_none());
         assert!(node.prev_sibling.is_none());
         assert!(node.next_sibling.is_none());
         match node.kind {
-            LayoutNodeKind::Container { first_child, last_child, .. } => {
+            LayoutNodeKind::Container {
+                first_child,
+                last_child,
+                ..
+            } => {
                 assert!(first_child.is_none());
                 assert!(last_child.is_none());
-            }
+            },
             LayoutNodeKind::Leaf { .. } => {},
         }
 
@@ -236,11 +232,11 @@ impl LayoutTree {
         match ip.prev_sibling {
             Some(prev_sibling) => {
                 node.next_sibling = self[prev_sibling].next_sibling;
-            }
+            },
             None => {
                 let parent = &mut self[ip.parent];
                 node.next_sibling = parent.first_child();
-            }
+            },
         }
 
         let new_next_sibling = node.next_sibling;
@@ -257,14 +253,18 @@ impl LayoutTree {
 
         let parent = &mut self[ip.parent];
         match parent.kind {
-            LayoutNodeKind::Container { ref mut first_child, ref mut last_child, .. } => {
+            LayoutNodeKind::Container {
+                ref mut first_child,
+                ref mut last_child,
+                ..
+            } => {
                 if ip.prev_sibling.is_none() {
                     *first_child = Some(id);
                 }
                 if *last_child == ip.prev_sibling {
                     *last_child = Some(id);
                 }
-            }
+            },
             LayoutNodeKind::Leaf { .. } => unreachable!(),
         }
 
@@ -285,9 +285,12 @@ impl LayoutTree {
             let parent = &mut self[parent];
             assert_eq!(parent.first_child(), Some(node_to_remove));
             match parent.kind {
-                LayoutNodeKind::Container { ref mut first_child, .. } => {
+                LayoutNodeKind::Container {
+                    ref mut first_child,
+                    ..
+                } => {
                     *first_child = removed_node.next_sibling;
-                }
+                },
                 LayoutNodeKind::Leaf { .. } => unreachable!(),
             }
         }
@@ -300,9 +303,11 @@ impl LayoutTree {
             let parent = &mut self[parent];
             assert_eq!(parent.last_child(), Some(node_to_remove));
             match parent.kind {
-                LayoutNodeKind::Container { ref mut last_child, .. } => {
+                LayoutNodeKind::Container {
+                    ref mut last_child, ..
+                } => {
                     *last_child = removed_node.prev_sibling;
-                }
+                },
                 LayoutNodeKind::Leaf { .. } => unreachable!(),
             }
         }

@@ -1,12 +1,11 @@
-
+use super::{ContainerKind, LayoutNode, LayoutNodeId, LayoutNodeKind, LayoutTree, LeafKind};
 use app_units::Au;
 use css;
 use dom;
 use euclid::Size2D;
-use super::{LayoutTree, LayoutNodeId, LayoutNode, LayoutNodeKind, ContainerKind, LeafKind};
 use style::{self, ComputedStyle};
 
-use kuchiki::{self, NodeRef, NodeData};
+use kuchiki::{self, NodeData, NodeRef};
 
 use std::collections::HashMap;
 use std::io::{self, Read};
@@ -64,7 +63,11 @@ impl LayoutTreeBuilder {
         let css = dom::read_stylesheets(&dom);
 
         let ua_sheet = fs::read_to_string(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join("css").join("res").join("ua.css")
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("src")
+                .join("css")
+                .join("res")
+                .join("ua.css"),
         )?;
 
         let mut style_rules = css::parse_css(&ua_sheet);
@@ -102,14 +105,13 @@ impl LayoutTreeBuilder {
             NodeData::DocumentFragment |
             NodeData::Comment(..) |
             NodeData::ProcessingInstruction(..) => return None,
-            NodeData::Text(..) |
-            NodeData::Element(..) => {},
+            NodeData::Text(..) | NodeData::Element(..) => {},
         }
 
         let mut dom_parent = node.parent()?;
         loop {
             if dom_parent.as_document().is_some() {
-                return Some(self.layout_tree.root())
+                return Some(self.layout_tree.root());
             }
             let layout_parent = match self.principal_boxes.for_node(&dom_parent) {
                 Some(node) => *node,
@@ -119,7 +121,7 @@ impl LayoutTreeBuilder {
                     }
                     dom_parent = dom_parent.parent()?;
                     continue;
-                }
+                },
             };
             return match self.layout_tree[layout_parent].kind {
                 LayoutNodeKind::Container { .. } => Some(layout_parent),
@@ -133,7 +135,7 @@ impl LayoutTreeBuilder {
     fn find_insertion_prev_sibling(&self, mut node: NodeRef) -> Option<LayoutNodeId> {
         loop {
             if let Some(node) = self.principal_boxes.for_node(&node) {
-                return Some(*node)
+                return Some(*node);
             }
             if let Some(style) = self.styles.for_node(&node) {
                 if style.display == style::Display::Contents {
@@ -172,13 +174,15 @@ impl LayoutTreeBuilder {
         }
     }
 
-
     /// Returns the layout node that should be the parent of `node` (without
     /// accounting for any kind of anonymous boxes or anything of the sort).
     fn dom_insertion_point(&self, node: &NodeRef) -> Option<InsertionPoint> {
         let parent = self.dom_insertion_parent(node)?;
         let prev_sibling = self.dom_insertion_prev_sibling(node);
-        Some(InsertionPoint { parent, prev_sibling })
+        Some(InsertionPoint {
+            parent,
+            prev_sibling,
+        })
     }
 
     fn insert_node_children(&mut self, parent: &NodeRef) {
@@ -201,7 +205,8 @@ impl LayoutTreeBuilder {
             self.styles.for_node(&parent)
         } else {
             self.styles.for_node(&node)
-        }.expect("Node should be styled if we found an insertion point for it");
+        }
+        .expect("Node should be styled if we found an insertion point for it");
 
         let new_box = match self.construct_box_for(node, style, &insertion_point) {
             Some(node) => node,
@@ -210,7 +215,7 @@ impl LayoutTreeBuilder {
                     self.insert_node_children(node);
                 }
                 return;
-            }
+            },
         };
 
         let id = self.layout_tree.insert(new_box, insertion_point);
@@ -226,16 +231,16 @@ impl LayoutTreeBuilder {
         style: &ComputedStyle,
         _insertion_point: &InsertionPoint,
     ) -> Option<LayoutNode> {
-        if style.display == style::Display::None ||
-           style.display == style::Display::Contents
-        {
+        if style.display == style::Display::None || style.display == style::Display::Contents {
             return None;
         }
 
         if let Some(text) = node.as_text() {
             return Some(LayoutNode::new_leaf(
                 style.clone(),
-                LeafKind::Text { text: text.borrow().clone().into_boxed_str() },
+                LeafKind::Text {
+                    text: text.borrow().clone().into_boxed_str(),
+                },
             ));
         }
 
@@ -249,10 +254,8 @@ impl LayoutTreeBuilder {
         }
 
         let container_kind = match style.display {
-            style::Display::None |
-            style::Display::Contents => unreachable!(),
-            style::Display::FlowRoot |
-            style::Display::Block => ContainerKind::Block,
+            style::Display::None | style::Display::Contents => unreachable!(),
+            style::Display::FlowRoot | style::Display::Block => ContainerKind::Block,
             style::Display::Inline => ContainerKind::Inline,
         };
         Some(LayoutNode::new_container(style.clone(), container_kind))

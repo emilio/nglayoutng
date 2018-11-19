@@ -1,7 +1,7 @@
 use app_units::Au;
-use euclid::{Size2D, SideOffsets2D};
-use logical_geometry::{self, LogicalSize, LogicalMargin};
 use cssparser::{Color, RGBA};
+use euclid::{SideOffsets2D, Size2D};
+use logical_geometry::{self, LogicalMargin, LogicalSize};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
 pub enum Display {
@@ -16,10 +16,7 @@ pub enum Display {
 impl Display {
     fn blockify(self) -> Self {
         match self {
-            Display::Block |
-            Display::FlowRoot |
-            Display::None |
-            Display::Contents => self,
+            Display::Block | Display::FlowRoot | Display::None | Display::Contents => self,
             Display::Inline => Display::Block,
         }
     }
@@ -43,11 +40,8 @@ pub enum Position {
 impl Position {
     fn is_out_of_flow(&self) -> bool {
         match *self {
-            Position::Absolute |
-            Position::Fixed => true,
-            Position::Static |
-            Position::Relative |
-            Position::Sticky => false,
+            Position::Absolute | Position::Fixed => true,
+            Position::Static | Position::Relative | Position::Sticky => false,
         }
     }
 }
@@ -303,7 +297,7 @@ impl ComputedStyle {
             text_orientation: self.text_orientation,
             computed_writing_mode: self.computed_writing_mode,
             color: self.color,
-            .. Self::initial()
+            ..Self::initial()
         }
     }
 
@@ -312,10 +306,10 @@ impl ComputedStyle {
             pseudo: Some(PseudoElement::Viewport),
             display: Display::Block,
             original_display: Display::Block,
-            .. Self::initial()
-        }.finish(false)
+            ..Self::initial()
+        }
+        .finish(false)
     }
-
 
     fn physical_padding(&self) -> SideOffsets2D<LengthPercentage> {
         SideOffsets2D::new(
@@ -345,10 +339,7 @@ impl ComputedStyle {
     }
 
     fn physical_size(&self) -> Size2D<LengthPercentageOrAuto> {
-        Size2D::new(
-            self.width,
-            self.height
-        )
+        Size2D::new(self.width, self.height)
     }
 
     pub fn size(&self) -> LogicalSize<LengthPercentageOrAuto> {

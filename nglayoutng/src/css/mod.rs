@@ -7,11 +7,11 @@
 
 use app_units::Au;
 use cssparser::{self, CowRcStr, Parser, ParserInput, Token};
+use logical_geometry::WritingMode;
 use smallvec::SmallVec;
 use std::collections::HashMap;
 use std::rc::Rc;
 use style::{self, ComputedStyle, MutableComputedStyle};
-use logical_geometry::WritingMode;
 
 #[derive(PropertyDeclaration)]
 pub enum PropertyDeclaration {
@@ -181,10 +181,7 @@ impl<'i> cssparser::QualifiedRuleParser<'i> for CssParser {
     }
 }
 
-fn length_from_dimension(
-    unit: &str,
-    value: f32,
-) -> Result<style::Length, ()> {
+fn length_from_dimension(unit: &str, value: f32) -> Result<style::Length, ()> {
     if !unit.eq_ignore_ascii_case("px") {
         return Err(());
     }
@@ -199,35 +196,42 @@ fn parse_rgba<'i>(input: &mut Parser<'i, '_>) -> Result<cssparser::RGBA, ParseEr
     let color = parse_color(input)?;
     match color {
         cssparser::Color::RGBA(rgba) => Ok(rgba),
-        cssparser::Color::CurrentColor => {
-            Err(input.new_custom_error(Error::CurrentColorInColor))
-        }
+        cssparser::Color::CurrentColor => Err(input.new_custom_error(Error::CurrentColorInColor)),
     }
 }
 
 fn parse_length<'i>(input: &mut Parser<'i, '_>) -> Result<style::Length, ParseError<'i>> {
     let location = input.current_source_location();
     match *input.next()? {
-        Token::Dimension { ref unit, value, .. } => {
-            length_from_dimension(unit, value)
-                .map_err(|()| location.new_custom_error(Error::UnknownLengthUnit(unit.clone())))
-        }
-        ref t => Err(location.new_unexpected_token_error(t.clone()))
+        Token::Dimension {
+            ref unit, value, ..
+        } => length_from_dimension(unit, value)
+            .map_err(|()| location.new_custom_error(Error::UnknownLengthUnit(unit.clone()))),
+        ref t => Err(location.new_unexpected_token_error(t.clone())),
     }
 }
 
-fn parse_length_or_percentage<'i>(input: &mut Parser<'i, '_>) -> Result<style::LengthPercentage, ParseError<'i>> {
+fn parse_length_or_percentage<'i>(
+    input: &mut Parser<'i, '_>,
+) -> Result<style::LengthPercentage, ParseError<'i>> {
     let location = input.current_source_location();
     match *input.next()? {
-        Token::Dimension { ref unit, value, .. } => return Ok(style::LengthPercentage {
-            fixed: length_from_dimension(unit, value)
-                .map_err(|()| location.new_custom_error(Error::UnknownLengthUnit(unit.clone())))?,
-            percentage: None,
-        }),
-        Token::Percentage { unit_value, .. } => return Ok(style::LengthPercentage {
-            fixed: Default::default(),
-            percentage: Some(style::Percentage(unit_value))
-        }),
+        Token::Dimension {
+            ref unit, value, ..
+        } => {
+            return Ok(style::LengthPercentage {
+                fixed: length_from_dimension(unit, value).map_err(|()| {
+                    location.new_custom_error(Error::UnknownLengthUnit(unit.clone()))
+                })?,
+                percentage: None,
+            })
+        },
+        Token::Percentage { unit_value, .. } => {
+            return Ok(style::LengthPercentage {
+                fixed: Default::default(),
+                percentage: Some(style::Percentage(unit_value)),
+            })
+        },
         Token::Function(ref name) if name.eq_ignore_ascii_case("calc") => {},
         ref t => return Err(location.new_unexpected_token_error(t.clone())),
     }
@@ -236,10 +240,13 @@ fn parse_length_or_percentage<'i>(input: &mut Parser<'i, '_>) -> Result<style::L
         let location = input.current_source_location();
 
         let sign = match *input.next()? {
-            Token::Delim(c @ '-') |
-            Token::Delim(c @ '+') => {
-                if c == '+' { 1.0 } else { -1.0 }
-            }
+            Token::Delim(c @ '-') | Token::Delim(c @ '+') => {
+                if c == '+' {
+                    1.0
+                } else {
+                    -1.0
+                }
+            },
             ref t => return Err(location.new_unexpected_token_error(t.clone())),
         };
 
@@ -252,11 +259,15 @@ fn parse_length_or_percentage<'i>(input: &mut Parser<'i, '_>) -> Result<style::L
     })
 }
 
-fn parse_length_or_percentage_or_auto<'i>(input: &mut Parser<'i, '_>) -> Result<style::LengthPercentageOrAuto, ParseError<'i>> {
+fn parse_length_or_percentage_or_auto<'i>(
+    input: &mut Parser<'i, '_>,
+) -> Result<style::LengthPercentageOrAuto, ParseError<'i>> {
     if input.try(|i| i.expect_ident_matching("auto")).is_ok() {
         return Ok(style::LengthPercentageOrAuto::Auto);
     }
-    Ok(style::LengthPercentageOrAuto::LengthPercentage(parse_length_or_percentage(input)?))
+    Ok(style::LengthPercentageOrAuto::LengthPercentage(
+        parse_length_or_percentage(input)?,
+    ))
 }
 
 fn parse_overflow_shorthand<'i>(
@@ -282,27 +293,27 @@ fn parse_border<'i>(
             if let Ok(value) = input.try(parse_color) {
                 color = Some(value);
                 any = true;
-                continue
+                continue;
             }
         }
         if style.is_none() {
             if let Ok(value) = input.try(style::BorderStyle::parse) {
                 style = Some(value);
                 any = true;
-                continue
+                continue;
             }
         }
         if width.is_none() {
             if let Ok(value) = input.try(parse_length) {
                 width = Some(value);
                 any = true;
-                continue
+                continue;
             }
         }
-        break
+        break;
     }
     if !any {
-        return Err(input.new_custom_error(Error::EmptyBorder))
+        return Err(input.new_custom_error(Error::EmptyBorder));
     }
     let mut ret = SmallVec::new();
     let color = color.unwrap_or(cssparser::Color::CurrentColor);
@@ -327,7 +338,6 @@ fn parse_border<'i>(
     Ok(ret)
 }
 
-
 fn parse_four_sides<'i, L>(
     input: &mut Parser<'i, '_>,
     get_top: fn(L) -> PropertyDeclaration,
@@ -351,33 +361,31 @@ where
             ret.push(get_right(right));
             ret.push(get_bottom(bottom));
             ret.push(get_left(left));
-        }
+        },
         (None, None, None) => {
             ret.push(get_top(top.clone()));
             ret.push(get_right(top.clone()));
             ret.push(get_bottom(top.clone()));
             ret.push(get_left(top));
-        }
+        },
         (Some(right), None, None) => {
             ret.push(get_top(top.clone()));
             ret.push(get_right(right.clone()));
             ret.push(get_bottom(top));
             ret.push(get_left(right));
-        }
+        },
         (Some(right), Some(bottom), None) => {
             ret.push(get_top(top));
             ret.push(get_right(right.clone()));
             ret.push(get_bottom(bottom));
             ret.push(get_left(right));
-        }
+        },
         _ => unreachable!(),
     }
 
     assert_eq!(ret.len(), 4);
     Ok(ret)
 }
-
-
 
 struct PropertyDeclarationParser;
 impl<'i> cssparser::DeclarationParser<'i> for PropertyDeclarationParser {
@@ -392,7 +400,7 @@ impl<'i> cssparser::DeclarationParser<'i> for PropertyDeclarationParser {
         if let Ok(longhand) = PropertyDeclaration::parse_longhand(&name, input) {
             let mut declarations = SmallVec::new();
             declarations.push(longhand);
-            return Ok(declarations)
+            return Ok(declarations);
         }
 
         match_ignore_ascii_case! { &name,
@@ -450,7 +458,9 @@ impl<'i> cssparser::AtRuleParser<'i> for PropertyDeclarationParser {
     type Error = Error<'i>;
 }
 
-pub fn parse_declarations<'i>(input: &mut Parser<'i, '_>) -> Result<Vec<PropertyDeclaration>, (ParseError<'i>, &'i str)> {
+pub fn parse_declarations<'i>(
+    input: &mut Parser<'i, '_>,
+) -> Result<Vec<PropertyDeclaration>, (ParseError<'i>, &'i str)> {
     let mut declarations = Vec::new();
     let iter = cssparser::DeclarationListParser::new(input, PropertyDeclarationParser);
     for declaration_list in iter {
@@ -459,7 +469,7 @@ pub fn parse_declarations<'i>(input: &mut Parser<'i, '_>) -> Result<Vec<Property
             Err(e) => {
                 eprintln!("CSS declaration dropped: {:?}", e);
                 continue;
-            }
+            },
         };
         for declaration in declaration_list {
             declarations.push(declaration);
@@ -481,7 +491,7 @@ pub fn parse_css<'i>(css: &'i str) -> Vec<Rule> {
             Err((error, string)) => {
                 eprintln!("Rule dropped: {:?}, {:?}", error, string);
                 continue;
-            }
+            },
         };
         css_rules.push(Rc::new(rule));
     }
@@ -569,7 +579,7 @@ fn compute_styles_for_tree(
                 compute_styles_for_tree(&child, rules, inherited_style, map);
             }
             return;
-        }
+        },
     };
 
     let mut matching_declaration_blocks = Vec::new();
@@ -580,11 +590,15 @@ fn compute_styles_for_tree(
         }
     }
 
-    let style_attr = element.attributes.borrow().get("style").and_then(|style_attr| {
-        let mut input = ParserInput::new(style_attr);
-        let mut input = Parser::new(&mut input);
-        parse_declarations(&mut input).ok()
-    });
+    let style_attr = element
+        .attributes
+        .borrow()
+        .get("style")
+        .and_then(|style_attr| {
+            let mut input = ParserInput::new(style_attr);
+            let mut input = Parser::new(&mut input);
+            parse_declarations(&mut input).ok()
+        });
 
     if let Some(ref s) = style_attr {
         matching_declaration_blocks.push(s);

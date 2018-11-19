@@ -2,8 +2,8 @@
 //! and running.
 
 use html5ever::LocalName;
-use kuchiki::{self, NodeData, NodeRef};
 use kuchiki::traits::*;
+use kuchiki::{self, NodeData, NodeRef};
 use misc::print_tree::PrintTree;
 use std::io::{self, Read};
 
@@ -12,9 +12,7 @@ pub fn build_dom<R>(input: &mut R) -> io::Result<NodeRef>
 where
     R: Read,
 {
-    kuchiki::parse_html()
-        .from_utf8()
-        .read_from(input)
+    kuchiki::parse_html().from_utf8().read_from(input)
 }
 
 fn print_node(node: &NodeRef, print: &mut PrintTree) {
@@ -26,15 +24,12 @@ fn print_node(node: &NodeRef, print: &mut PrintTree) {
             let content = content.borrow();
             format!("<?{} {}?>", content.0, content.1)
         },
-        NodeData::Doctype(ref doctype) => {
-            format!("<!DOCTYPE {} {} {}>", doctype.name, doctype.public_id, doctype.system_id)
-        },
-        NodeData::Text(ref text) => {
-            format!("#text {:?}", text.borrow())
-        },
-        NodeData::Element(ref element) => {
-            format!("<{}>", element.name.local)
-        }
+        NodeData::Doctype(ref doctype) => format!(
+            "<!DOCTYPE {} {} {}>",
+            doctype.name, doctype.public_id, doctype.system_id
+        ),
+        NodeData::Text(ref text) => format!("#text {:?}", text.borrow()),
+        NodeData::Element(ref element) => format!("<{}>", element.name.local),
     });
 
     for child in node.children() {
@@ -63,11 +58,7 @@ pub fn read_stylesheets(root: &NodeRef) -> String {
     css
 }
 
-fn read_stylesheets_from(
-    node: &NodeRef,
-    css: &mut String,
-    mut in_sheet: bool,
-) {
+fn read_stylesheets_from(node: &NodeRef, css: &mut String, mut in_sheet: bool) {
     match node.data() {
         NodeData::Document(..) |
         NodeData::DocumentFragment |
@@ -78,10 +69,10 @@ fn read_stylesheets_from(
             if in_sheet {
                 css.push_str(&text.borrow());
             }
-        }
+        },
         NodeData::Element(ref element) => {
             in_sheet = element.name.local == LocalName::from("style");
-        }
+        },
     }
 
     for child in node.children() {

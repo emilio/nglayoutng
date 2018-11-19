@@ -7,8 +7,7 @@ fn generate_tests() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let mut dst = File::create(Path::new(&out_dir).join("tests.rs")).unwrap();
 
-    let manifest_dir =
-        PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let html_dir = manifest_dir.join("tests").join("html");
     let html = fs::read_dir(html_dir).unwrap();
 
@@ -18,10 +17,7 @@ fn generate_tests() {
 
     for entry in html {
         let entry = entry.unwrap();
-        assert_eq!(
-            entry.path().extension().unwrap().to_str().unwrap(),
-            "html",
-        );
+        assert_eq!(entry.path().extension().unwrap().to_str().unwrap(), "html");
 
         let func = entry
             .file_name()
@@ -35,7 +31,8 @@ fn generate_tests() {
             func,
             entry.path(),
             expectations_path,
-        ).unwrap();
+        )
+        .unwrap();
     }
 }
 

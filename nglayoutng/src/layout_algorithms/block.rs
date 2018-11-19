@@ -1,5 +1,5 @@
-use super::{LayoutContext, ConstraintSpace};
-use layout_tree::{LayoutNode};
+use super::{ConstraintSpace, LayoutContext};
+use layout_tree::LayoutNode;
 
 pub type BreakToken = (); // TODO: Need to figure out fragmentation.
 

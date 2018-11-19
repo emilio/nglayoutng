@@ -1,13 +1,12 @@
-
 pub mod block;
 // pub mod inline;
 
 use app_units::Au;
 use euclid::Size2D;
-use logical_geometry::LogicalSize;
-use html5ever::tree_builder::QuirksMode;
 use fragment_tree::ChildFragment;
+use html5ever::tree_builder::QuirksMode;
 use layout_tree::LayoutTree;
+use logical_geometry::LogicalSize;
 
 /// A struct that contains global information about this layout pass.
 pub struct LayoutContext<'a> {
