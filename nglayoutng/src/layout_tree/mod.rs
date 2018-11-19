@@ -71,6 +71,22 @@ impl LayoutNode {
         }
     }
 
+    pub fn is_floating(&self) -> bool {
+        self.style.is_floating()
+    }
+
+    pub fn is_out_of_flow_positioned(&self) -> bool {
+        self.style.is_out_of_flow_positioned()
+    }
+
+    pub fn is_out_of_flow(&self) -> bool {
+        self.style.is_out_of_flow()
+    }
+
+    pub fn is_in_flow(&self) -> bool {
+        !self.is_out_of_flow()
+    }
+
     /// https://drafts.csswg.org/css2/visuren.html#block-formatting
     ///
     /// > Floats, absolutely positioned elements, block containers (such as
@@ -111,7 +127,7 @@ impl LayoutNode {
 
     /// Returns whether this box establishes an inline formatting context.
     ///
-    /// We only need to check the first child because we can't have both
+    /// We only need to check the first in-flow child because we can't have both
     /// block-level and inline-level children in the same formatting context.
     ///
     /// FIXME: That's not enforced right now, but should be (need to deal with
@@ -122,7 +138,7 @@ impl LayoutNode {
             return false;
         }
 
-        match self.children(tree).next() {
+        match self.in_flow_children(tree).next() {
             // TODO: Is checking display: inline enough here?
             Some(c) => c.display() == Display::Inline,
             None => false,
@@ -213,6 +229,13 @@ impl LayoutNode {
             tree,
             get_next: |node| node.prev_sibling(),
         }
+    }
+
+    pub fn in_flow_children<'tree>(
+        &self,
+        tree: &'tree LayoutTree,
+    ) -> impl Iterator<Item = &'tree LayoutNode> {
+        self.children(tree).filter(|c| c.is_in_flow())
     }
 }
 

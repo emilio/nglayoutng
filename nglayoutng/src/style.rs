@@ -224,7 +224,7 @@ impl MutableComputedStyle {
         }
 
         // FIXME(emilio): Blockify flex items and such.
-        if self.is_floating() || self.is_out_of_flow() || is_root_element {
+        if self.is_out_of_flow() || is_root_element {
             self.display = self.display.blockify();
         }
 
@@ -255,7 +255,7 @@ impl MutableComputedStyle {
     }
 
     pub fn is_out_of_flow(&self) -> bool {
-        self.position.is_out_of_flow() || self.is_floating()
+        self.is_out_of_flow_positioned() || self.is_floating()
     }
 }
 
