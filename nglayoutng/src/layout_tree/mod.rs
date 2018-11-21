@@ -125,7 +125,7 @@ impl LayoutNode {
         false
     }
 
-    fn print_label(&self, tree: &LayoutTree) -> String {
+    fn print_label(&self) -> String {
         let mut label = match self.kind {
             LayoutNodeKind::Container { ref kind, .. } => format!("{:?}", kind),
             LayoutNodeKind::Leaf { ref kind } => format!("{:?}", kind),
@@ -143,7 +143,7 @@ impl LayoutNode {
     }
 
     fn print(&self, tree: &LayoutTree, printer: &mut PrintTree) {
-        printer.new_level(self.print_label(tree));
+        printer.new_level(self.print_label());
         for child in self.children(tree) {
             child.print(tree, printer);
         }
