@@ -17,6 +17,7 @@ use proc_macro::TokenStream;
 mod cg;
 mod keyword;
 mod property_declaration;
+mod break_token;
 
 #[proc_macro_derive(Keyword, attributes(css, parse))]
 pub fn derive_parse(stream: TokenStream) -> TokenStream {
@@ -28,4 +29,10 @@ pub fn derive_parse(stream: TokenStream) -> TokenStream {
 pub fn derive_property_declaration(stream: TokenStream) -> TokenStream {
     let input = syn::parse(stream).unwrap();
     property_declaration::derive(input).into()
+}
+
+#[proc_macro_derive(BreakToken)]
+pub fn derive_break_token(stream: TokenStream) -> TokenStream {
+    let input = syn::parse(stream).unwrap();
+    break_token::derive(input).into()
 }

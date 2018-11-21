@@ -7,6 +7,7 @@ use euclid::Size2D;
 use logical_geometry;
 use misc::print_tree::PrintTree;
 use style::{self, ComputedStyle, Display};
+use layout_algorithms::{LayoutContext, GenericLayoutResult, ConstraintSpace};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct LayoutNodeId(usize);
@@ -62,6 +63,15 @@ impl LayoutNode {
             next_sibling: None,
             kind,
         }
+    }
+
+    pub fn layout(
+        &self,
+        _context: &LayoutContext,
+        _constraints: &ConstraintSpace,
+    ) -> GenericLayoutResult {
+        // TODO
+        unimplemented!()
     }
 
     pub fn is_container(&self) -> bool {
@@ -277,6 +287,10 @@ impl LayoutTree {
 
     pub fn root(&self) -> LayoutNodeId {
         self.root
+    }
+
+    pub fn root_node(&self) -> &LayoutNode {
+        &self[self.root]
     }
 
     pub fn insert(&mut self, mut node: LayoutNode, ip: InsertionPoint) -> LayoutNodeId {

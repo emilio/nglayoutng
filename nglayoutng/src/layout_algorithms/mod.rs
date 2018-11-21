@@ -28,6 +28,17 @@ pub struct ConstraintSpace {
     // TODO(emilio): Sure we need to add more stuff here.
 }
 
+#[derive(BreakToken)]
+pub enum GenericBreakToken {
+    Block(block::BreakToken),
+}
+
+/// A generic layout result from any layout algorithm.
+pub struct GenericLayoutResult {
+    pub root_fragment: ChildFragment,
+    pub break_token: Option<GenericBreakToken>,
+}
+
 /// A layout result for a given layout algorithm.
 pub struct LayoutResult<BreakToken> {
     /// The main fragment this layout pass has generated.
@@ -35,6 +46,18 @@ pub struct LayoutResult<BreakToken> {
     /// The break token allows to resume layout for the given layout algorithm
     /// and fragment.
     pub break_token: Option<BreakToken>,
+}
+
+impl<BreakToken> LayoutResult<BreakToken>
+where
+    BreakToken: Into<GenericBreakToken>,
+{
+    pub fn into_generic(self) -> GenericLayoutResult {
+        GenericLayoutResult {
+            root_fragment: self.root_fragment,
+            break_token: self.break_token.map(Into::into),
+        }
+    }
 }
 
 pub trait LayoutAlgorithm {
