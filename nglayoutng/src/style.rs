@@ -133,6 +133,25 @@ pub struct LengthPercentage {
     pub percentage: Option<Percentage>,
 }
 
+impl LengthPercentage {
+    #[inline]
+    pub fn resolve(&self, percentage_resolution_size: Au) -> Au {
+        self.fixed.0 +
+            self.percentage.map_or(Au(0), |p| percentage_resolution_size.scale_by(p.0))
+    }
+
+    /// Resolve a `LengthPercentage` value against a resolution size, if
+    /// present.
+    #[inline]
+    pub fn maybe_resolve(&self, percentage_resolution_size: Option<Au>) -> Option<Au> {
+        let mut result = self.fixed.0;
+        if let Some(percentage) = self.percentage {
+            result += percentage_resolution_size?.scale_by(percentage.0);
+        }
+        Some(result)
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum LengthPercentageOrAuto {
     LengthPercentage(LengthPercentage),

@@ -6,7 +6,7 @@ use euclid::Size2D;
 use fragment_tree::ChildFragment;
 use html5ever::tree_builder::QuirksMode;
 use layout_tree::LayoutTree;
-use logical_geometry::LogicalSize;
+use logical_geometry::{LogicalSize, WritingMode};
 
 /// A struct that contains global information about this layout pass.
 pub struct LayoutContext<'a> {
@@ -25,7 +25,18 @@ pub type AvailableSize = LogicalSize<Option<Au>>;
 /// The constraints we're using for a given layout.
 pub struct ConstraintSpace {
     pub available_size: AvailableSize,
+
+    pub containing_block_size: Size2D<Au>,
+    pub containing_block_writing_mode: WritingMode,
+
     // TODO(emilio): Sure we need to add more stuff here.
+}
+
+impl ConstraintSpace {
+    /// Returns the logical containing-block size.
+    pub fn cb_size(&self) -> LogicalSize<Au> {
+        LogicalSize::from_physical(self.containing_block_writing_mode, self.containing_block_size)
+    }
 }
 
 #[derive(BreakToken)]
