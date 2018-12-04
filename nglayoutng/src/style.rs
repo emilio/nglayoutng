@@ -145,6 +145,34 @@ impl Default for LengthPercentageOrAuto {
     }
 }
 
+/// https://drafts.csswg.org/css-sizing/#sizing-properties
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
+pub enum SizeKeyword {
+    Auto,
+    MinContent,
+    MaxContent,
+}
+
+impl Default for SizeKeyword {
+    fn default() -> Self {
+        SizeKeyword::Auto
+    }
+}
+
+/// https://drafts.csswg.org/css-sizing/#sizing-properties
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Size {
+    LengthPercentage(LengthPercentage),
+    Keyword(SizeKeyword),
+    // TODO(emilio): fit-content?
+}
+
+impl Default for Size {
+    fn default() -> Self {
+        Size::Keyword(SizeKeyword::Auto)
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum PseudoElement {
     Before,
@@ -175,8 +203,14 @@ pub struct MutableComputedStyle {
     pub color: RGBA,
     pub background_color: Color,
 
-    pub width: LengthPercentageOrAuto,
-    pub height: LengthPercentageOrAuto,
+    pub width: Size,
+    pub height: Size,
+
+    pub min_width: Size,
+    pub min_height: Size,
+
+    pub max_width: Size,
+    pub max_height: Size,
 
     pub padding_top: LengthPercentage,
     pub padding_right: LengthPercentage,
@@ -289,6 +323,12 @@ impl ComputedStyle {
             width: Default::default(),
             height: Default::default(),
 
+            min_width: Default::default(),
+            min_height: Default::default(),
+
+            max_width: Default::default(),
+            max_height: Default::default(),
+
             padding_top: Default::default(),
             padding_right: Default::default(),
             padding_bottom: Default::default(),
@@ -369,12 +409,28 @@ impl ComputedStyle {
         )
     }
 
-    fn physical_size(&self) -> Size2D<LengthPercentageOrAuto> {
+    fn physical_size(&self) -> Size2D<Size> {
         Size2D::new(self.width, self.height)
     }
 
-    pub fn size(&self) -> LogicalSize<LengthPercentageOrAuto> {
+    pub fn size(&self) -> LogicalSize<Size> {
         LogicalSize::from_physical(self.writing_mode, self.physical_size())
+    }
+
+    fn physical_max_size(&self) -> Size2D<Size> {
+        Size2D::new(self.max_width, self.max_height)
+    }
+
+    pub fn max_size(&self) -> LogicalSize<Size> {
+        LogicalSize::from_physical(self.writing_mode, self.physical_max_size())
+    }
+
+    fn physical_min_size(&self) -> Size2D<Size> {
+        Size2D::new(self.min_width, self.min_height)
+    }
+
+    pub fn min_size(&self) -> LogicalSize<Size> {
+        LogicalSize::from_physical(self.writing_mode, self.physical_min_size())
     }
 
     pub fn margin(&self) -> LogicalMargin<LengthPercentageOrAuto> {

@@ -25,13 +25,26 @@ pub enum PropertyDeclaration {
     Color(cssparser::RGBA),
     BackgroundColor(cssparser::Color),
 
-    Width(style::LengthPercentageOrAuto),
-    Height(style::LengthPercentageOrAuto),
+    Width(style::Size),
+    Height(style::Size),
+    #[declaration(logical)]
+    InlineSize(style::Size),
+    #[declaration(logical)]
+    BlockSize(style::Size),
 
+    MinWidth(style::Size),
+    MinHeight(style::Size),
     #[declaration(logical)]
-    InlineSize(style::LengthPercentageOrAuto),
+    MinInlineSize(style::Size),
     #[declaration(logical)]
-    BlockSize(style::LengthPercentageOrAuto),
+    MinBlockSize(style::Size),
+
+    MaxWidth(style::Size),
+    MaxHeight(style::Size),
+    #[declaration(logical)]
+    MaxInlineSize(style::Size),
+    #[declaration(logical)]
+    MaxBlockSize(style::Size),
 
     MarginTop(style::LengthPercentageOrAuto),
     MarginLeft(style::LengthPercentageOrAuto),
@@ -257,6 +270,13 @@ fn parse_length_or_percentage<'i>(
             percentage: Some(percentage),
         })
     })
+}
+
+fn parse_size<'i>(input: &mut Parser<'i, '_>) -> Result<style::Size, ParseError<'i>> {
+    if let Ok(lop) = input.try(parse_length_or_percentage) {
+        return Ok(style::Size::LengthPercentage(lop));
+    }
+    Ok(style::Size::Keyword(style::SizeKeyword::parse(input)?))
 }
 
 fn parse_length_or_percentage_or_auto<'i>(
