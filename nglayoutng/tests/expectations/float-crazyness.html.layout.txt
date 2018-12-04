@@ -3,9 +3,13 @@
 │  │  ├─ Block
 │  │  │  ├─ Block
 │  │  │  │  ├─ Block
-│  │  │  │  │  ├─ Text { text: "\n" }
+│  │  │  │  │  ├─ Text { text: "\n  " }
+│  │  │  │  │  ├─ Text { text: "\n  " }
 │  │  │  │  │  ├─ Block
+│  │  │  │  │  │  ├─ Text { text: "\n    " }
 │  │  │  │  │  │  ├─ Block (oof) (bfc)
-│  │  │  │  │  ├─ Text { text: "\n" }
+│  │  │  │  │  │  ├─ Text { text: "\n  " }
+│  │  │  │  │  ├─ Text { text: "\n  " }
 │  │  │  │  │  ├─ Block (bfc)
 │  │  │  │  │  ├─ Text { text: "\n" }
+│  │  │  │  ├─ Text { text: "\n" }

@@ -5,9 +5,14 @@
 │  │  │  ├─ <head>
 │  │  │  ├─ <body>
 │  │  │  │  ├─ <div>
-│  │  │  │  │  ├─ #text "\n"
+│  │  │  │  │  ├─ #text "\n  "
+│  │  │  │  │  ├─ <!--  This margin collapses with the one after it if the float doesn't push the div below down  -->
+│  │  │  │  │  ├─ #text "\n  "
 │  │  │  │  │  ├─ <div>
+│  │  │  │  │  │  ├─ #text "\n    "
 │  │  │  │  │  │  ├─ <span>
-│  │  │  │  │  ├─ #text "\n"
+│  │  │  │  │  │  ├─ #text "\n  "
+│  │  │  │  │  ├─ #text "\n  "
 │  │  │  │  │  ├─ <div>
 │  │  │  │  │  ├─ #text "\n"
+│  │  │  │  ├─ #text "\n"
