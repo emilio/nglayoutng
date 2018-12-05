@@ -2,7 +2,7 @@ use app_units::Au;
 use super::{ConstraintSpace, LayoutContext};
 use layout_tree::LayoutNode;
 use logical_geometry::LogicalSize;
-use style::{Size, SizeKeyword};
+use style::Size;
 
 pub type BreakToken = (); // TODO: Need to figure out fragmentation.
 
@@ -31,7 +31,7 @@ impl<'a> BlockLayoutAlgorithm<'a> {
             Size::LengthPercentage(ref lop) => {
                 lop.resolve(cb_size.inline)
             }
-            Size::Keyword(keyword) => unimplemented!(),
+            Size::Keyword(_keyword) => unimplemented!(),
         };
 
 
@@ -39,7 +39,7 @@ impl<'a> BlockLayoutAlgorithm<'a> {
             Size::LengthPercentage(ref lop) => {
                 lop.resolve(cb_size.inline)
             }
-            Size::Keyword(keyword) => unimplemented!(),
+            Size::Keyword(_keyword) => unimplemented!(),
         };
 
         LogicalSize::new(style.writing_mode, inline_size, block_size)
@@ -51,9 +51,9 @@ impl<'a> super::LayoutAlgorithm for BlockLayoutAlgorithm<'a> {
 
     fn layout(
         &self,
-        context: &LayoutContext,
-        constraints: &ConstraintSpace,
-        break_token: Option<BreakToken>,
+        _context: &LayoutContext,
+        _constraints: &ConstraintSpace,
+        _break_token: Option<BreakToken>,
     ) -> LayoutResult {
         unimplemented!()
     }
