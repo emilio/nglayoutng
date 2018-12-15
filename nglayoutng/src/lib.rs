@@ -20,6 +20,7 @@ pub mod layout_algorithms;
 pub mod layout_tree;
 pub mod logical_geometry;
 mod misc;
+pub mod sizing;
 pub mod style;
 
 pub use app_units::Au;
