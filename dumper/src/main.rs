@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate clap;
+extern crate env_logger;
+extern crate log;
 extern crate nglayoutng;
 
 use nglayoutng::dom::print_dom;
@@ -13,6 +15,8 @@ enum DumpKind {
 
 fn main() {
     use clap::{AppSettings, SubCommand};
+
+    env_logger::init();
 
     let args = app_from_crate!()
         .subcommand(
@@ -44,6 +48,7 @@ fn main() {
     let builder = LayoutTreeBuilder::new(&mut file).expect("Failed to parse input file?");
 
     let result = builder.build();
+    result.layout_tree.assert_consistent();
     match kind {
         DumpKind::Layout => result.layout_tree.print(),
         DumpKind::Dom => print_dom(&result.dom),

@@ -311,6 +311,10 @@ impl MutableComputedStyle {
     pub fn is_out_of_flow(&self) -> bool {
         self.is_out_of_flow_positioned() || self.is_floating()
     }
+
+    pub fn is_ib_split_wrapper(&self) -> bool {
+        self.pseudo.map_or(false, |p| p == PseudoElement::BlockInsideInlineWrapper)
+    }
 }
 
 impl ComputedStyle {
@@ -392,11 +396,19 @@ impl ComputedStyle {
         }
     }
 
-    pub fn for_viewport() -> ComputedStyle {
+    pub fn for_viewport() -> Self {
+        Self::new_anonymous(PseudoElement::Viewport, Display::Block)
+    }
+
+    pub fn for_ib_split_wrapper() -> Self {
+        Self::new_anonymous(PseudoElement::BlockInsideInlineWrapper, Display::Block)
+    }
+
+    pub fn new_anonymous(pseudo: PseudoElement, display: Display) -> Self {
         MutableComputedStyle {
-            pseudo: Some(PseudoElement::Viewport),
-            display: Display::Block,
-            original_display: Display::Block,
+            pseudo: Some(pseudo),
+            display,
+            original_display: display,
             ..Self::initial()
         }
         .finish(false)

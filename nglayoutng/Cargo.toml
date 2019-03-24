@@ -11,6 +11,7 @@ smallvec = "0.6"
 kuchiki = "0.7"
 html5ever = "0.22"
 cssparser = "0.24"
+log = "0.4.6"
 nglayoutng_derive = { path = "../derive" }
 
 [dev-dependencies]

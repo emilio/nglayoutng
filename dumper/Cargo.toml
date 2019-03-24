@@ -6,3 +6,5 @@ authors = ["Emilio Cobos Álvarez <emilio@crisal.io>"]
 [dependencies]
 nglayoutng = { path = "../nglayoutng" }
 clap = "2.32"
+log = "0.4"
+env_logger = "0.6"

@@ -49,6 +49,7 @@ pub struct LayoutTreeBuilderResult {
     pub dom: NodeRef,
 }
 
+#[derive(Debug)]
 pub struct InsertionPoint {
     pub parent: LayoutNodeId,
     pub prev_sibling: Option<LayoutNodeId>,

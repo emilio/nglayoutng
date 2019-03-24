@@ -1,0 +1,15 @@
+┌ DOM tree
+│  ├─ #document
+│  │  ├─ <!DOCTYPE html  >
+│  │  ├─ <html>
+│  │  │  ├─ <head>
+│  │  │  ├─ <body>
+│  │  │  │  ├─ <span>
+│  │  │  │  │  ├─ #text "\n  My parent is an inline.\n  "
+│  │  │  │  │  ├─ <div>
+│  │  │  │  │  │  ├─ #text "\n    And mine is a block.\n  "
+│  │  │  │  │  ├─ #text "\n  More inline content here.\n  "
+│  │  │  │  │  ├─ <span>
+│  │  │  │  │  │  ├─ #text "Moar inline"
+│  │  │  │  │  ├─ #text "\n"
+│  │  │  │  ├─ #text "\n"
