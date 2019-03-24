@@ -220,7 +220,6 @@ impl LayoutTreeBuilder {
 
         let id = self.layout_tree.insert(new_box, insertion_point);
         self.principal_boxes.insert(&**node, id);
-
         self.insert_node_children(node);
     }
 

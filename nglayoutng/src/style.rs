@@ -197,6 +197,7 @@ pub enum PseudoElement {
     Before,
     After,
     Viewport,
+    BlockInsideInlineWrapper,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -293,51 +293,150 @@ impl LayoutTree {
         &self[self.root]
     }
 
-    pub fn insert(&mut self, mut node: LayoutNode, ip: InsertionPoint) -> LayoutNodeId {
-        assert!(node.parent.is_none());
-        assert!(node.prev_sibling.is_none());
-        assert!(node.next_sibling.is_none());
-        match node.kind {
-            LayoutNodeKind::Container {
-                first_child,
-                last_child,
-                ..
-            } => {
-                assert!(first_child.is_none());
-                assert!(last_child.is_none());
-            },
-            LayoutNodeKind::Leaf { .. } => {},
-        }
-
-        // TODO(emilio): Anon boxes will need to be handled here or somewhere
-        // before here.
-        if let Some(prev_sibling) = ip.prev_sibling {
-            assert_eq!(self[prev_sibling].parent, Some(ip.parent));
-        }
-
-        node.parent = Some(ip.parent);
-        node.prev_sibling = ip.prev_sibling;
-
-        match ip.prev_sibling {
-            Some(prev_sibling) => {
-                node.next_sibling = self[prev_sibling].next_sibling;
-            },
-            None => {
-                let parent = &mut self[ip.parent];
-                node.next_sibling = parent.first_child();
-            },
-        }
-
-        let new_next_sibling = node.next_sibling;
-
+    pub fn insert(&mut self, node: LayoutNode, mut ip: InsertionPoint) -> LayoutNodeId {
+        // TODO(emilio): Also need to handle table anonymous wrappers and
+        // company.
+        ip = self.create_split_if_needed(&node, ip);
         let id = LayoutNodeId(self.nodes.allocate(node));
+        self.insert_unchecked(id, ip);
+        id
+    }
+
+    fn creates_ib_split(&self, node_style: &ComputedStyle, ip: &InsertionPoint) -> bool {
+        // If the parent is not an inline, then it's definitely not an IB-split.
+        if self[ip.parent].style.display != Display::Inline {
+            return false;
+        }
+        if !node_style.display.is_block_outside() {
+            return false;
+        }
+        if node_style.is_out_of_flow() {
+            return false;
+        }
+        return true;
+    }
+
+    #[allow(unused)]
+    fn unchecked_move_all_children_to(
+        &mut self,
+        from_node: LayoutNodeId,
+        to_node: LayoutNodeId,
+        prev_sibling: Option<LayoutNodeId>,
+    ) {
+        let (first_child, _last_child) = match self[from_node].kind {
+            LayoutNodeKind::Container { ref mut first_child, ref mut last_child, .. } => {
+                (first_child.take(), last_child.take())
+            }
+            LayoutNodeKind::Leaf { .. }=> unreachable!(),
+        };
+
+        let mut current = first_child;
+        while let Some(child) = current {
+            // Un-parent the child, save next sibling so that we can
+            // continue the loop.
+            let child_prev_sibling = {
+                let mut child = &mut self[child];
+                assert_eq!(child.parent, Some(from_node));
+                child.parent = None;
+
+                current = child.next_sibling.take();
+                let prev_sibling = child.prev_sibling.take();
+                prev_sibling
+            };
+
+            let ip = InsertionPoint {
+                parent: to_node,
+                prev_sibling: child_prev_sibling.or(prev_sibling),
+            };
+            self.insert_unchecked(child, ip);
+        }
+    }
+
+    #[allow(unused)]
+    fn create_ib_split_anonymous_block(&mut self) -> LayoutNodeId {
+        unimplemented!()
+    }
+
+    /// Ensures that a valid ib-split block wrapper is created right after the
+    /// previous sibling (along with corresponding inline next-siblings if
+    /// needed, so that there's always a trailing inline).
+    ///
+    /// Returns the id of the new anonymous block parent.
+    fn ensure_ib_sibling_is_created_for(&mut self, _ip: &InsertionPoint) -> LayoutNodeId {
+        // Whatever happens, we're going to need to create an anonymous block
+        // for the new block.
+        // let block = self.create_ib_split_anonymous_block();
+        // let inline = self.create_inline_continuation(ip.parent);
+        // self.unchecked_move_all_children_to(ip.parent, inline, XXX need a 'move children range');
+        // let ip = InsertionPoint {
+        //     parent: self[ip.parent].parent.expect("There should be no unparented inlines"),
+        //     prev_sibling: ip.parent,
+        // };
+        // self.insert_unchecked(block, ip);
+        // block
+        unimplemented!();
+    }
+
+    /// Handles IB-split, table-anon-boxes creation, and such.
+    ///
+    /// TODO(emilio): We need to dynamically remove splits as well when style
+    /// changes.
+    fn create_split_if_needed(
+        &mut self,
+        for_node: &LayoutNode,
+        ip: InsertionPoint,
+    ) -> InsertionPoint {
+        if !self.creates_ib_split(&for_node.style, &ip) {
+            return ip;
+        }
+        let parent_block = self.ensure_ib_sibling_is_created_for(&ip);
+        InsertionPoint {
+            parent: parent_block,
+            prev_sibling: None,
+        }
+    }
+
+    fn insert_unchecked(&mut self, node_id: LayoutNodeId, ip: InsertionPoint) {
+        {
+            let node = &self[node_id];
+            assert!(node.parent.is_none());
+            assert!(node.prev_sibling.is_none());
+            assert!(node.next_sibling.is_none());
+            match node.kind {
+                LayoutNodeKind::Container {
+                    first_child,
+                    last_child,
+                    ..
+                } => {
+                    assert!(first_child.is_none());
+                    assert!(last_child.is_none());
+                },
+                LayoutNodeKind::Leaf { .. } => {},
+            }
+
+            if let Some(prev_sibling) = ip.prev_sibling {
+                assert_eq!(self[prev_sibling].parent, Some(ip.parent));
+            }
+        }
+
+        let new_next_sibling = match ip.prev_sibling {
+            Some(prev_sibling) => self[prev_sibling].next_sibling,
+            None => self[ip.parent].first_child(),
+        };
+
+        {
+            let mut node = &mut self[node_id];
+            node.parent = Some(ip.parent);
+            node.prev_sibling = ip.prev_sibling;
+            node.next_sibling = new_next_sibling;
+        }
 
         if let Some(prev_sibling) = ip.prev_sibling {
-            self[prev_sibling].next_sibling = Some(id);
+            self[prev_sibling].next_sibling = Some(node_id);
         }
 
         if let Some(next_sibling) = new_next_sibling {
-            self[next_sibling].prev_sibling = Some(id);
+            self[next_sibling].prev_sibling = Some(node_id);
         }
 
         let parent = &mut self[ip.parent];
@@ -348,16 +447,14 @@ impl LayoutTree {
                 ..
             } => {
                 if ip.prev_sibling.is_none() {
-                    *first_child = Some(id);
+                    *first_child = Some(node_id);
                 }
                 if *last_child == ip.prev_sibling {
-                    *last_child = Some(id);
+                    *last_child = Some(node_id);
                 }
             },
             LayoutNodeKind::Leaf { .. } => unreachable!(),
         }
-
-        id
     }
 
     pub fn destroy(&mut self, node_to_remove: LayoutNodeId) {
