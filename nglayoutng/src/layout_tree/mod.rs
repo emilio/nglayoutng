@@ -4,10 +4,10 @@ use self::builder::InsertionPoint;
 use allocator;
 use app_units::Au;
 use euclid::Size2D;
+use layout_algorithms::{ConstraintSpace, GenericLayoutResult, LayoutContext};
 use logical_geometry;
 use misc::print_tree::PrintTree;
 use style::{self, ComputedStyle, Display};
-use layout_algorithms::{LayoutContext, GenericLayoutResult, ConstraintSpace};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct LayoutNodeId(usize);
@@ -79,7 +79,8 @@ impl LayoutNode {
     }
 
     fn is_inline(&self) -> bool {
-        self.container_kind().map_or(false, |k| k == ContainerKind::Inline)
+        self.container_kind()
+            .map_or(false, |k| k == ContainerKind::Inline)
     }
 
     fn is_ib_split_wrapper(&self) -> bool {
@@ -331,8 +332,18 @@ impl LayoutTree {
         let mut expected_prev_sibling = None;
         for (id, child) in self[root].children_and_id(self) {
             self.assert_subtree_consistent(id);
-            assert_eq!(child.parent, Some(root), "Unexpected parent, child {:?} - {:?}", id, child);
-            assert_eq!(child.prev_sibling, expected_prev_sibling, "Unexpected prev_sibling, child {:?} - {:#?} - {:#?}", id, child, self[root]);
+            assert_eq!(
+                child.parent,
+                Some(root),
+                "Unexpected parent, child {:?} - {:?}",
+                id,
+                child
+            );
+            assert_eq!(
+                child.prev_sibling, expected_prev_sibling,
+                "Unexpected prev_sibling, child {:?} - {:#?} - {:#?}",
+                id, child, self[root]
+            );
             expected_prev_sibling = Some(id);
             expected_count += 1;
         }
@@ -340,8 +351,18 @@ impl LayoutTree {
         let mut expected_next_sibling = None;
         let mut reverse_count = 0;
         for (id, child) in self[root].rev_children_and_id(self) {
-            assert_eq!(child.parent, Some(root), "Unexpected parent, child {:?} - {:?}", id, child);
-            assert_eq!(child.next_sibling, expected_next_sibling, "Unexpected next_sibling, child {:?} - {:#?} - {:#?}", id, child, self[root]);
+            assert_eq!(
+                child.parent,
+                Some(root),
+                "Unexpected parent, child {:?} - {:?}",
+                id,
+                child
+            );
+            assert_eq!(
+                child.next_sibling, expected_next_sibling,
+                "Unexpected next_sibling, child {:?} - {:#?} - {:#?}",
+                id, child, self[root]
+            );
             expected_next_sibling = Some(id);
             reverse_count += 1;
         }
@@ -386,7 +407,12 @@ impl LayoutTree {
         to_node: LayoutNodeId,
         from_sibling: Option<LayoutNodeId>,
     ) {
-        trace!("unchecked_move_children_to({:?}, {:?}, {:?})", from_node, to_node, from_sibling);
+        trace!(
+            "unchecked_move_children_to({:?}, {:?}, {:?})",
+            from_node,
+            to_node,
+            from_sibling
+        );
         let first_sibling_to_move = {
             let mut first_sibling_to_move = match from_sibling {
                 Some(from_sibling) => self[from_sibling].next_sibling.take(),
@@ -394,13 +420,17 @@ impl LayoutTree {
             };
 
             match self[from_node].kind {
-                LayoutNodeKind::Container { ref mut first_child, ref mut last_child, .. } => {
+                LayoutNodeKind::Container {
+                    ref mut first_child,
+                    ref mut last_child,
+                    ..
+                } => {
                     *last_child = from_sibling;
                     if from_sibling.is_none() {
                         first_sibling_to_move = first_child.take();
                     }
-                }
-                LayoutNodeKind::Leaf { .. }=> unreachable!(),
+                },
+                LayoutNodeKind::Leaf { .. } => unreachable!(),
             };
 
             first_sibling_to_move
@@ -457,7 +487,9 @@ impl LayoutTree {
         // for the new block, and at least a new inline.
         let block = self.create_ib_split_anonymous_block();
         let inline = self.create_inline_continuation(ip.parent);
-        let grandparent = self[ip.parent].parent.expect("There should be no un-parented inlines");
+        let grandparent = self[ip.parent]
+            .parent
+            .expect("There should be no un-parented inlines");
 
         {
             let ip = InsertionPoint {
@@ -568,10 +600,16 @@ impl LayoutTree {
             None => return ip,
         };
         let prev_sibling = &self[prev_sibling_id];
-        assert!(!prev_sibling.is_ib_split_wrapper(), "Shouldn't get here with an ib-split wrapper");
+        assert!(
+            !prev_sibling.is_ib_split_wrapper(),
+            "Shouldn't get here with an ib-split wrapper"
+        );
         if self.creates_ib_split(&prev_sibling.style, ip.parent) {
             assert!(
-                prev_sibling.next_sibling.map_or(true, |next_sibling| !self[next_sibling].is_ib_split_wrapper()),
+                prev_sibling
+                    .next_sibling
+                    .map_or(true, |next_sibling| !self[next_sibling]
+                        .is_ib_split_wrapper()),
                 "Non-inlines shouldn't have ib-wrapping siblings"
             );
 
@@ -608,7 +646,11 @@ impl LayoutTree {
         trace!("create_split_if_needed({:?})", ip);
         if !self.creates_ib_split(&for_node.style, ip.parent) {
             let new_ip = self.adjusted_insertion_point_for_ib_split(ip);
-            trace!("adjusted_insertion_point_for_ib_split: {:?} -> {:?}", ip, new_ip);
+            trace!(
+                "adjusted_insertion_point_for_ib_split: {:?} -> {:?}",
+                ip,
+                new_ip
+            );
             return new_ip;
         }
 

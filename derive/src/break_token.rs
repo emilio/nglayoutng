@@ -19,8 +19,7 @@ pub fn derive(input: DeriveInput) -> Tokens {
         let ty = &bindings[0].ast().ty;
 
         let variant_name = &variant.ast().ident;
-        let lowercased =
-            cg::to_css_identifier(variant.ast().ident.as_ref()).replace("-", "_");
+        let lowercased = cg::to_css_identifier(variant.ast().ident.as_ref()).replace("-", "_");
 
         let as_name = Ident::from(format!("as_{}", lowercased));
         let into_name = Ident::from(format!("into_{}", lowercased));
@@ -51,7 +50,7 @@ pub fn derive(input: DeriveInput) -> Tokens {
                 }
             }
         };
-    };
+    }
 
     impls
 }

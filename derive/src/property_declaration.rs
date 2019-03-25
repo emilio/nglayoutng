@@ -51,7 +51,7 @@ pub fn derive(input: DeriveInput) -> Tokens {
             let height = Ident::from(field_name.replace(pattern_to_replace, "height"));
 
             let maybe_neg = if is_block {
-                quote!{}
+                quote! {}
             } else {
                 quote! { ! }
             };

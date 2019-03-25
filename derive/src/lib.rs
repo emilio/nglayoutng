@@ -14,10 +14,10 @@ extern crate synstructure;
 
 use proc_macro::TokenStream;
 
+mod break_token;
 mod cg;
 mod keyword;
 mod property_declaration;
-mod break_token;
 
 #[proc_macro_derive(Keyword, attributes(css, parse))]
 pub fn derive_parse(stream: TokenStream) -> TokenStream {

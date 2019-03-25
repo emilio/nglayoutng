@@ -137,7 +137,8 @@ impl LengthPercentage {
     #[inline]
     pub fn resolve(&self, percentage_resolution_size: Au) -> Au {
         self.fixed.0 +
-            self.percentage.map_or(Au(0), |p| percentage_resolution_size.scale_by(p.0))
+            self.percentage
+                .map_or(Au(0), |p| percentage_resolution_size.scale_by(p.0))
     }
 
     /// Resolve a `LengthPercentage` value against a resolution size, if
@@ -313,7 +314,8 @@ impl MutableComputedStyle {
     }
 
     pub fn is_ib_split_wrapper(&self) -> bool {
-        self.pseudo.map_or(false, |p| p == PseudoElement::BlockInsideInlineWrapper)
+        self.pseudo
+            .map_or(false, |p| p == PseudoElement::BlockInsideInlineWrapper)
     }
 }
 

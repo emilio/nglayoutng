@@ -28,14 +28,16 @@ pub struct ConstraintSpace {
 
     pub containing_block_size: Size2D<Au>,
     pub containing_block_writing_mode: WritingMode,
-
     // TODO(emilio): Sure we need to add more stuff here.
 }
 
 impl ConstraintSpace {
     /// Returns the logical containing-block size.
     pub fn cb_size(&self) -> LogicalSize<Au> {
-        LogicalSize::from_physical(self.containing_block_writing_mode, self.containing_block_size)
+        LogicalSize::from_physical(
+            self.containing_block_writing_mode,
+            self.containing_block_size,
+        )
     }
 }
 

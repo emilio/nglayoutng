@@ -1,6 +1,6 @@
-use sizing;
 use super::{ConstraintSpace, LayoutContext};
 use layout_tree::LayoutNode;
+use sizing;
 
 pub type BreakToken = (); // TODO: Need to figure out fragmentation.
 
@@ -31,11 +31,7 @@ impl<'a> super::LayoutAlgorithm for BlockLayoutAlgorithm<'a> {
         _break_token: Option<BreakToken>,
     ) -> LayoutResult {
         let min_max = self.compute_min_max_size();
-        let _pref_size = sizing::pref_size(
-            &self.input_node.style,
-            constraints,
-            &min_max,
-        );
+        let _pref_size = sizing::pref_size(&self.input_node.style, constraints, &min_max);
 
         unimplemented!()
     }
