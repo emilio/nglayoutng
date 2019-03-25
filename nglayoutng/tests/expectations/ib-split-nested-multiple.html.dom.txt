@@ -1,0 +1,25 @@
+┌ DOM tree
+│  ├─ #document
+│  │  ├─ <!DOCTYPE html  >
+│  │  ├─ <!--  TODO(emilio): Output for this test is wrong, the IB-split blocks get misordered  -->
+│  │  ├─ <html>
+│  │  │  ├─ <head>
+│  │  │  ├─ <body>
+│  │  │  │  ├─ <span>
+│  │  │  │  │  ├─ #text "\n  Outer inline.\n  "
+│  │  │  │  │  ├─ <span>
+│  │  │  │  │  │  ├─ #text "\n    My parent is an inline.\n    "
+│  │  │  │  │  │  ├─ <div>
+│  │  │  │  │  │  │  ├─ #text "\n      And mine is a block.\n    "
+│  │  │  │  │  │  ├─ #text "\n    More inline content here.\n    "
+│  │  │  │  │  │  ├─ <span>
+│  │  │  │  │  │  │  ├─ #text "Moar inline"
+│  │  │  │  │  │  ├─ #text "\n  "
+│  │  │  │  │  ├─ #text "\n  Moar inlines\n  "
+│  │  │  │  │  ├─ <div>
+│  │  │  │  │  │  ├─ #text "\n    And a random block here.\n  "
+│  │  │  │  │  ├─ #text "\n  "
+│  │  │  │  │  ├─ <span>
+│  │  │  │  │  │  ├─ #text "And more inside the split"
+│  │  │  │  │  ├─ #text "\n"
+│  │  │  │  ├─ #text "\nOutside split inline\n"

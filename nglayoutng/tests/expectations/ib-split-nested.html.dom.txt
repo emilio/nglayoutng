@@ -1,0 +1,21 @@
+┌ DOM tree
+│  ├─ #document
+│  │  ├─ <!DOCTYPE html  >
+│  │  ├─ <html>
+│  │  │  ├─ <head>
+│  │  │  ├─ <body>
+│  │  │  │  ├─ <span>
+│  │  │  │  │  ├─ #text "\n  Outer inline.\n  "
+│  │  │  │  │  ├─ <span>
+│  │  │  │  │  │  ├─ #text "\n    My parent is an inline.\n    "
+│  │  │  │  │  │  ├─ <div>
+│  │  │  │  │  │  │  ├─ #text "\n      And mine is a block.\n    "
+│  │  │  │  │  │  ├─ #text "\n    More inline content here.\n    "
+│  │  │  │  │  │  ├─ <span>
+│  │  │  │  │  │  │  ├─ #text "Moar inline"
+│  │  │  │  │  │  ├─ #text "\n  "
+│  │  │  │  │  ├─ #text "\n  Moar inlines\n  "
+│  │  │  │  │  ├─ <span>
+│  │  │  │  │  │  ├─ #text "And more inside the split"
+│  │  │  │  │  ├─ #text "\n"
+│  │  │  │  ├─ #text "\nOutside split inline\n"

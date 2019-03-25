@@ -157,6 +157,8 @@ impl LayoutNode {
             LayoutNodeKind::Leaf { ref kind } => format!("{:?}", kind),
         };
 
+        // label.push_str(&format!(" - {:?}", _id));
+
         if self.is_out_of_flow() {
             label.push_str(" (oof)");
         }
@@ -384,6 +386,7 @@ impl LayoutTree {
         to_node: LayoutNodeId,
         from_sibling: Option<LayoutNodeId>,
     ) {
+        trace!("unchecked_move_children_to({:?}, {:?}, {:?})", from_node, to_node, from_sibling);
         let first_sibling_to_move = {
             let mut first_sibling_to_move = match from_sibling {
                 Some(from_sibling) => self[from_sibling].next_sibling.take(),
@@ -413,13 +416,16 @@ impl LayoutTree {
                 child.parent = None;
 
                 current = child.next_sibling.take();
-                let prev_sibling = child.prev_sibling.take();
-                prev_sibling
+                child.prev_sibling.take()
             };
 
             let ip = InsertionPoint {
                 parent: to_node,
-                prev_sibling: child_prev_sibling,
+                prev_sibling: if child_prev_sibling == from_sibling {
+                    None
+                } else {
+                    child_prev_sibling
+                },
             };
             self.insert_unchecked(child, ip);
         }
@@ -446,6 +452,7 @@ impl LayoutTree {
     ///
     /// Returns the id of the new anonymous block parent.
     fn ensure_ib_sibling_is_created_for(&mut self, ip: &InsertionPoint) -> LayoutNodeId {
+        trace!("ensure_ib_sibling_is_created_for({:?})", ip);
         // Whatever happens, we're going to need to create an anonymous block
         // for the new block, and at least a new inline.
         let block = self.create_ib_split_anonymous_block();
@@ -469,7 +476,61 @@ impl LayoutTree {
 
         // Move all children after the prev sibiling to the inline-continuation.
         self.unchecked_move_children_to(ip.parent, inline, ip.prev_sibling);
+
+        // If the prev sibling is an block wrapper, move it to our block as
+        // well.
+        if let Some(prev) = ip.prev_sibling {
+            if self[prev].is_ib_split_wrapper() {
+                let prev_sibling = self[prev].prev_sibling;
+                self.unchecked_move_children_to(ip.parent, block, prev_sibling);
+            }
+        }
+
         block
+    }
+
+    fn next_ib_wrapper_for_inline(&self, id: LayoutNodeId) -> Option<LayoutNodeId> {
+        let mut depth = 0;
+        let mut current_inline = Some(id);
+        while let Some(inline) = current_inline {
+            assert!(self[inline].is_inline());
+            if let Some(mut sibling) = self[inline].next_sibling {
+                if !self[sibling].is_ib_split_wrapper() {
+                    return None;
+                }
+                for _ in 0..depth {
+                    sibling = self[sibling].first_child().unwrap();
+                }
+                assert!(self[sibling].is_ib_split_wrapper());
+                return Some(sibling);
+            }
+            let parent = self[inline].parent?;
+            if !self[parent].is_inline() {
+                return None;
+            }
+            depth += 1;
+            current_inline = Some(parent);
+        }
+        unreachable!("How did we exit the loop?");
+    }
+
+    fn next_inline_for_ib_wrapper(&self, id: LayoutNodeId) -> LayoutNodeId {
+        assert!(self[id].is_ib_split_wrapper());
+        let mut current_ib_sibling = Some(id);
+        let mut depth = 0;
+        while let Some(ib_wrapper) = current_ib_sibling {
+            assert!(self[ib_wrapper].is_ib_split_wrapper());
+            if let Some(mut next_inline) = self[ib_wrapper].next_sibling {
+                // Go back to our level.
+                for _ in 0..depth {
+                    next_inline = self[next_inline].first_child().unwrap();
+                }
+                return next_inline;
+            }
+            current_ib_sibling = self[ib_wrapper].parent;
+            depth += 1;
+        }
+        unreachable!("Should always have a trailing inline");
     }
 
     fn last_inline_continuation(&self, id: LayoutNodeId) -> LayoutNodeId {
@@ -482,17 +543,12 @@ impl LayoutTree {
             let inline = &self[inline_id];
             assert!(inline.is_inline());
 
-            let next_sibling = match inline.next_sibling {
+            let wrapper = match self.next_ib_wrapper_for_inline(inline_id) {
                 Some(next_sibling) => next_sibling,
                 None => return inline_id,
             };
 
-            let maybe_ib_sibling = &self[next_sibling];
-            if !maybe_ib_sibling.is_ib_split_wrapper() {
-                return inline_id;
-            }
-
-            current_inline = maybe_ib_sibling.next_sibling;
+            current_inline = Some(self.next_inline_for_ib_wrapper(wrapper));
         }
 
         unreachable!("should always have a trailing inline");
@@ -524,10 +580,8 @@ impl LayoutTree {
             // for this node). In this case, where we really want to insert
             // ourselves is in the following inline continuation.
             let parent = prev_sibling.parent.unwrap();
-            let parent = &self[parent];
-            assert!(parent.is_ib_split_wrapper(), "Somehow didn't wrap a block inside an inline?");
             return InsertionPoint {
-                parent: parent.next_sibling.expect("There should always be a trailing inline"),
+                parent: self.next_inline_for_ib_wrapper(parent),
                 prev_sibling: None,
             };
         }
@@ -551,10 +605,32 @@ impl LayoutTree {
         for_node: &LayoutNode,
         ip: InsertionPoint,
     ) -> InsertionPoint {
+        trace!("create_split_if_needed({:?})", ip);
         if !self.creates_ib_split(&for_node.style, ip.parent) {
-            return self.adjusted_insertion_point_for_ib_split(ip)
+            let new_ip = self.adjusted_insertion_point_for_ib_split(ip);
+            trace!("adjusted_insertion_point_for_ib_split: {:?} -> {:?}", ip, new_ip);
+            return new_ip;
         }
+
         let parent_block = self.ensure_ib_sibling_is_created_for(&ip);
+        // We need to also split arbitrary inline ancestors.
+        {
+            let mut current_parent = self[ip.parent].parent;
+            let mut current_block = parent_block;
+            while let Some(parent) = current_parent {
+                if !self[parent].is_inline() {
+                    break;
+                }
+
+                let ip = InsertionPoint {
+                    parent,
+                    prev_sibling: Some(current_block),
+                };
+
+                current_block = self.ensure_ib_sibling_is_created_for(&ip);
+                current_parent = self[parent].parent;
+            }
+        }
         InsertionPoint {
             parent: parent_block,
             prev_sibling: None,

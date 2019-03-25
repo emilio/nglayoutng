@@ -12,4 +12,4 @@
 │  │  │  │  │  ├─ Inline
 │  │  │  │  │  │  ├─ Text { text: "Moar inline" }
 │  │  │  │  │  ├─ Text { text: "\n" }
-│  │  │  │  ├─ Text { text: "\n" }
+│  │  │  │  ├─ Text { text: "\nOutside split inline\n" }

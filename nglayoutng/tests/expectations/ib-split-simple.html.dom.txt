@@ -12,4 +12,4 @@
 │  │  │  │  │  ├─ <span>
 │  │  │  │  │  │  ├─ #text "Moar inline"
 │  │  │  │  │  ├─ #text "\n"
-│  │  │  │  ├─ #text "\n"
+│  │  │  │  ├─ #text "\nOutside split inline\n"
