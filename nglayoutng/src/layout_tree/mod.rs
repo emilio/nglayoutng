@@ -7,7 +7,7 @@ use euclid::Size2D;
 use layout_algorithms::{ConstraintSpace, GenericLayoutResult, LayoutContext};
 use logical_geometry;
 use misc::print_tree::PrintTree;
-use style::{self, ComputedStyle, Display};
+use style::{self, ComputedStyle, Display, PseudoElement};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct LayoutNodeId(usize);
@@ -20,8 +20,6 @@ pub enum LeafKind {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ContainerKind {
-    /// The top-level viewport box.
-    Viewport,
     Block,
     Inline,
 }
@@ -74,21 +72,22 @@ impl LayoutNode {
         unimplemented!()
     }
 
+    fn is_anonymous(&self) -> bool {
+        self.style.pseudo.map_or(false, |p| p.is_anonymous())
+    }
+
     pub fn is_container(&self) -> bool {
         self.container_kind().is_some()
     }
 
-    fn is_inline(&self) -> bool {
+    pub fn is_block_container(&self) -> bool {
         self.container_kind()
-            .map_or(false, |k| k == ContainerKind::Inline)
+            .map_or(false, |k| k == ContainerKind::Block)
     }
 
-    fn is_ib_split_wrapper(&self) -> bool {
-        let is_split = self.style.is_ib_split_wrapper();
-        if is_split {
-            assert_eq!(self.container_kind(), Some(ContainerKind::Block));
-        }
-        is_split
+    pub fn is_inline(&self) -> bool {
+        self.container_kind()
+            .map_or(false, |k| k == ContainerKind::Inline)
     }
 
     fn container_kind(&self) -> Option<ContainerKind> {
@@ -168,8 +167,8 @@ impl LayoutNode {
             label.push_str(" (bfc)");
         }
 
-        if self.is_ib_split_wrapper() {
-            label.push_str(" (ib-split-wrapper)");
+        if let Some(pseudo) = self.style.pseudo {
+            label.push_str(&format!(" ({:?})", pseudo));
         }
 
         label
@@ -210,6 +209,11 @@ impl LayoutNode {
         self.style.writing_mode
     }
 
+    pub fn has_children(&self) -> bool {
+        debug_assert_eq!(self.first_child().is_some(), self.last_child().is_some());
+        self.first_child().is_some()
+    }
+
     pub fn first_child(&self) -> Option<LayoutNodeId> {
         match self.kind {
             LayoutNodeKind::Container { first_child, .. } => first_child,
@@ -224,16 +228,12 @@ impl LayoutNode {
         }
     }
 
-    pub fn next_sibling(&self) -> Option<LayoutNodeId> {
-        self.next_sibling
+    pub fn next_sibling<'tree>(&self, tree: &'tree LayoutTree) -> Option<&'tree LayoutNode> {
+        Some(&tree[self.next_sibling?])
     }
 
-    pub fn prev_sibling(&self) -> Option<LayoutNodeId> {
-        self.prev_sibling
-    }
-
-    pub fn parent(&self) -> Option<LayoutNodeId> {
-        self.parent
+    pub fn prev_sibling_id<'tree>(&self, tree: &'tree LayoutTree) -> Option<&'tree LayoutNode> {
+        Some(&tree[self.prev_sibling?])
     }
 
     fn children_and_id<'tree>(
@@ -243,7 +243,7 @@ impl LayoutNode {
         Children {
             current: self.first_child(),
             tree,
-            get_next: |node| node.next_sibling(),
+            get_next: |node| node.next_sibling,
         }
     }
 
@@ -254,7 +254,7 @@ impl LayoutNode {
         Children {
             current: self.last_child(),
             tree,
-            get_next: |node| node.prev_sibling(),
+            get_next: |node| node.prev_sibling,
         }
     }
 
@@ -263,6 +263,10 @@ impl LayoutNode {
         tree: &'tree LayoutTree,
     ) -> impl Iterator<Item = &'tree LayoutNode> {
         self.children_and_id(tree).map(|(_id, child)| child)
+    }
+
+    pub fn parent<'tree>(&self, tree: &'tree LayoutTree) -> Option<&'tree LayoutNode> {
+        Some(&tree[self.parent?])
     }
 
     pub fn rev_children<'tree>(
@@ -313,8 +317,7 @@ pub struct LayoutTree {
 
 impl LayoutTree {
     pub fn new() -> Self {
-        let root =
-            LayoutNode::new_container(ComputedStyle::for_viewport(), ContainerKind::Viewport);
+        let root = LayoutNode::new_container(ComputedStyle::for_viewport(), ContainerKind::Block);
 
         let mut nodes = allocator::Allocator::default();
         let root = LayoutNodeId(nodes.allocate(root));
@@ -368,6 +371,33 @@ impl LayoutTree {
         }
 
         assert_eq!(reverse_count, expected_count);
+
+        match self[root].container_kind() {
+            None => {},
+            Some(ContainerKind::Block) => {
+                let mut saw_inline = false;
+                let mut saw_non_inline = false;
+                for child in self[root].children(self) {
+                    let inline = child.style.display.is_inline_outside();
+                    if inline {
+                        assert!(!saw_non_inline, "Mixed non-inlines and inlines in a block");
+                    } else {
+                        assert!(!saw_inline, "Mixed inlines and non-inlines in a block");
+                    }
+
+                    saw_inline |= inline;
+                    saw_non_inline |= !inline;
+                }
+            },
+            Some(ContainerKind::Inline) => {
+                for child in self[root].children(self) {
+                    assert!(
+                        !child.style.display.is_block_outside(),
+                        "Saw block inside an inline"
+                    );
+                }
+            },
+        }
     }
 
     pub fn root(&self) -> LayoutNodeId {
@@ -378,37 +408,38 @@ impl LayoutTree {
         &self[self.root]
     }
 
-    pub fn insert(&mut self, node: LayoutNode, mut ip: InsertionPoint) -> LayoutNodeId {
-        // TODO(emilio): Also need to handle table anonymous wrappers and
-        // company.
-        ip = self.create_split_if_needed(&node, ip);
-        let id = LayoutNodeId(self.nodes.allocate(node));
+    /// Allocates a node inside the tree. This node _must_ be inserted in the
+    /// layout tree.
+    #[must_use]
+    pub fn alloc(&mut self, node: LayoutNode) -> LayoutNodeId {
+        LayoutNodeId(self.nodes.allocate(node))
+    }
+
+    pub fn insert(&mut self, node: LayoutNode, ip: InsertionPoint) -> Option<LayoutNodeId> {
+        debug_assert!(!node.is_anonymous());
+        debug_assert!(
+            !self[ip.parent].is_anonymous() ||
+                self[ip.parent].style.pseudo == Some(PseudoElement::Viewport),
+        );
+        let container_kind = self[ip.parent].container_kind()?;
+        let ip = match container_kind {
+            ContainerKind::Inline => builder::inline::InlineInside::insertion(self, &node, ip)?,
+            ContainerKind::Block => builder::block::BlockInside::insertion(self, &node, ip)?,
+        };
+        // TODO: add table wrappers as needed.
+        let id = self.alloc(node);
         self.insert_unchecked(id, ip);
-        id
+        Some(id)
     }
 
-    fn creates_ib_split(&self, node_style: &ComputedStyle, container: LayoutNodeId) -> bool {
-        // If the parent is not an inline, then it's definitely not an IB-split.
-        if !self[container].is_inline() {
-            return false;
-        }
-        if !node_style.display.is_block_outside() {
-            return false;
-        }
-        if node_style.is_out_of_flow() {
-            return false;
-        }
-        return true;
-    }
-
-    fn unchecked_move_children_to(
+    pub fn move_children_to(
         &mut self,
         from_node: LayoutNodeId,
         to_node: LayoutNodeId,
         from_sibling: Option<LayoutNodeId>,
     ) {
         trace!(
-            "unchecked_move_children_to({:?}, {:?}, {:?})",
+            "move_children_to({:?}, {:?}, {:?})",
             from_node,
             to_node,
             from_sibling
@@ -461,225 +492,36 @@ impl LayoutTree {
         }
     }
 
-    fn create_ib_split_anonymous_block(&mut self) -> LayoutNodeId {
-        LayoutNodeId(self.nodes.allocate(LayoutNode::new_container(
-            ComputedStyle::for_ib_split_wrapper(),
-            ContainerKind::Block,
-        )))
-    }
-
-    fn create_inline_continuation(&mut self, inline: LayoutNodeId) -> LayoutNodeId {
-        assert_eq!(self[inline].style.display, Display::Inline);
-        assert_eq!(self[inline].container_kind(), Some(ContainerKind::Inline));
-        let style = self[inline].style.clone();
-        let node = LayoutNode::new_container(style, ContainerKind::Inline);
-        LayoutNodeId(self.nodes.allocate(node))
-    }
-
-    /// Ensures that a valid ib-split block wrapper is created right after the
-    /// previous sibling (along with corresponding inline next-siblings if
-    /// needed, so that there's always a trailing inline).
+    /// For a given insertion point of non-anonymous nodes, find the actual
+    /// insertion point that we should use, by adjusting the previous sibling in
+    /// order to "escape" from any anonymous wrapper, or walk outside of our
+    /// ib-split continuations.
     ///
-    /// Returns the id of the new anonymous block parent.
-    fn ensure_ib_sibling_is_created_for(&mut self, ip: &InsertionPoint) -> LayoutNodeId {
-        trace!("ensure_ib_sibling_is_created_for({:?})", ip);
-        // Whatever happens, we're going to need to create an anonymous block
-        // for the new block, and at least a new inline.
-        let block = self.create_ib_split_anonymous_block();
-        let inline = self.create_inline_continuation(ip.parent);
-        let grandparent = self[ip.parent]
-            .parent
-            .expect("There should be no un-parented inlines");
-
-        {
-            let ip = InsertionPoint {
-                parent: grandparent,
-                prev_sibling: Some(ip.parent),
-            };
-
-            self.insert_unchecked(block, ip);
-
-            let ip = InsertionPoint {
-                parent: grandparent,
-                prev_sibling: Some(block),
-            };
-            self.insert_unchecked(inline, ip);
-        }
-
-        // Move all children after the prev sibiling to the inline-continuation.
-        self.unchecked_move_children_to(ip.parent, inline, ip.prev_sibling);
-
-        // If the prev sibling is an block wrapper, move it to our block as
-        // well.
-        if let Some(prev) = ip.prev_sibling {
-            if self[prev].is_ib_split_wrapper() {
-                let prev_sibling = self[prev].prev_sibling;
-                self.unchecked_move_children_to(ip.parent, block, prev_sibling);
-            }
-        }
-
-        block
-    }
-
-    fn next_ib_wrapper_for_inline(&self, id: LayoutNodeId) -> Option<LayoutNodeId> {
-        let mut depth = 0;
-        let mut current_inline = Some(id);
-        while let Some(inline) = current_inline {
-            assert!(self[inline].is_inline());
-            if let Some(mut sibling) = self[inline].next_sibling {
-                if !self[sibling].is_ib_split_wrapper() {
-                    return None;
-                }
-                for _ in 0..depth {
-                    sibling = self[sibling].first_child().unwrap();
-                }
-                assert!(self[sibling].is_ib_split_wrapper());
-                return Some(sibling);
-            }
-            let parent = self[inline].parent?;
-            if !self[parent].is_inline() {
-                return None;
-            }
-            depth += 1;
-            current_inline = Some(parent);
-        }
-        unreachable!("How did we exit the loop?");
-    }
-
-    fn next_inline_for_ib_wrapper(&self, id: LayoutNodeId) -> LayoutNodeId {
-        assert!(self[id].is_ib_split_wrapper());
-        let mut current_ib_sibling = Some(id);
-        let mut depth = 0;
-        while let Some(ib_wrapper) = current_ib_sibling {
-            assert!(self[ib_wrapper].is_ib_split_wrapper());
-            if let Some(mut next_inline) = self[ib_wrapper].next_sibling {
-                // Go back to our level.
-                for _ in 0..depth {
-                    next_inline = self[next_inline].first_child().unwrap();
-                }
-                return next_inline;
-            }
-            current_ib_sibling = self[ib_wrapper].parent;
-            depth += 1;
-        }
-        unreachable!("Should always have a trailing inline");
-    }
-
-    fn last_inline_continuation(&self, id: LayoutNodeId) -> LayoutNodeId {
-        if !self[id].is_inline() {
-            return id;
-        }
-
-        let mut current_inline = Some(id);
-        while let Some(inline_id) = current_inline {
-            let inline = &self[inline_id];
-            assert!(inline.is_inline());
-
-            let wrapper = match self.next_ib_wrapper_for_inline(inline_id) {
-                Some(next_sibling) => next_sibling,
-                None => return inline_id,
-            };
-
-            current_inline = Some(self.next_inline_for_ib_wrapper(wrapper));
-        }
-
-        unreachable!("should always have a trailing inline");
-    }
-
-    fn adjusted_insertion_point_for_ib_split(&self, ip: InsertionPoint) -> InsertionPoint {
-        let parent = &self[ip.parent];
-        if !parent.is_inline() {
-            return InsertionPoint {
-                parent: ip.parent,
-                prev_sibling: ip.prev_sibling.map(|p| self.last_inline_continuation(p)),
-            };
-        }
-
-        let prev_sibling_id = match ip.prev_sibling {
-            Some(prev_sibling) => prev_sibling,
+    /// TODO(emilio): Maybe find a better name for this?
+    pub fn legalize_insertion_point(&self, ip: InsertionPoint) -> InsertionPoint {
+        let InsertionPoint {
+            parent,
+            prev_sibling,
+        } = ip;
+        let mut prev_sibling = match prev_sibling {
+            Some(s) => s,
             None => return ip,
         };
-        let prev_sibling = &self[prev_sibling_id];
-        assert!(
-            !prev_sibling.is_ib_split_wrapper(),
-            "Shouldn't get here with an ib-split wrapper"
-        );
-        if self.creates_ib_split(&prev_sibling.style, ip.parent) {
-            assert!(
-                prev_sibling
-                    .next_sibling
-                    .map_or(true, |next_sibling| !self[next_sibling]
-                        .is_ib_split_wrapper()),
-                "Non-inlines shouldn't have ib-wrapping siblings"
-            );
-
-            // If we're inserting after a block wrapped in an ib split wrapper,
-            // then this is not a block itself (otherwise we'd create a wrapper
-            // for this node). In this case, where we really want to insert
-            // ourselves is in the following inline continuation.
-            let parent = prev_sibling.parent.unwrap();
-            return InsertionPoint {
-                parent: self.next_inline_for_ib_wrapper(parent),
-                prev_sibling: None,
-            };
+        loop {
+            let maybe_parent = self[prev_sibling].parent.unwrap();
+            if maybe_parent == parent {
+                break;
+            }
+            assert!(self[maybe_parent].is_anonymous());
+            prev_sibling = maybe_parent;
         }
-
-        // We're inserting inside an inline, and next to something that isn't a
-        // block. We want to insert using the right IB-split continuation, which
-        // is the one the inline is in.
-        let parent = self[prev_sibling_id].parent.unwrap();
         InsertionPoint {
             parent,
-            prev_sibling: ip.prev_sibling,
+            prev_sibling: Some(prev_sibling),
         }
     }
 
-    /// Handles IB-split, table-anon-boxes creation, and such.
-    ///
-    /// TODO(emilio): We need to dynamically remove splits as well when style
-    /// changes.
-    fn create_split_if_needed(
-        &mut self,
-        for_node: &LayoutNode,
-        ip: InsertionPoint,
-    ) -> InsertionPoint {
-        trace!("create_split_if_needed({:?})", ip);
-        if !self.creates_ib_split(&for_node.style, ip.parent) {
-            let new_ip = self.adjusted_insertion_point_for_ib_split(ip);
-            trace!(
-                "adjusted_insertion_point_for_ib_split: {:?} -> {:?}",
-                ip,
-                new_ip
-            );
-            return new_ip;
-        }
-
-        let parent_block = self.ensure_ib_sibling_is_created_for(&ip);
-        // We need to also split arbitrary inline ancestors.
-        {
-            let mut current_parent = self[ip.parent].parent;
-            let mut current_block = parent_block;
-            while let Some(parent) = current_parent {
-                if !self[parent].is_inline() {
-                    break;
-                }
-
-                let ip = InsertionPoint {
-                    parent,
-                    prev_sibling: Some(current_block),
-                };
-
-                current_block = self.ensure_ib_sibling_is_created_for(&ip);
-                current_parent = self[parent].parent;
-            }
-        }
-        InsertionPoint {
-            parent: parent_block,
-            prev_sibling: None,
-        }
-    }
-
-    fn insert_unchecked(&mut self, node_id: LayoutNodeId, ip: InsertionPoint) {
+    pub fn insert_unchecked(&mut self, node_id: LayoutNodeId, ip: InsertionPoint) {
         trace!("Inserting {:?} into {:?}", node_id, ip);
         self.assert_subtree_consistent(ip.parent);
 
@@ -688,18 +530,6 @@ impl LayoutTree {
             assert!(node.parent.is_none());
             assert!(node.prev_sibling.is_none());
             assert!(node.next_sibling.is_none());
-            match node.kind {
-                LayoutNodeKind::Container {
-                    first_child,
-                    last_child,
-                    ..
-                } => {
-                    assert!(first_child.is_none());
-                    assert!(last_child.is_none());
-                },
-                LayoutNodeKind::Leaf { .. } => {},
-            }
-
             if let Some(prev_sibling) = ip.prev_sibling {
                 assert_eq!(self[prev_sibling].parent, Some(ip.parent));
             }
@@ -796,7 +626,7 @@ impl LayoutTree {
         // Now recursively tear down the children.
         let mut child = removed_node.first_child();
         while let Some(child_to_remove) = child.take() {
-            child = self[child_to_remove].next_sibling();
+            child = self[child_to_remove].next_sibling;
             self.destroy(child_to_remove);
         }
     }

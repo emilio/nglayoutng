@@ -1,0 +1,24 @@
+┌ DOM tree
+│  ├─ #document
+│  │  ├─ <!DOCTYPE html  >
+│  │  ├─ <html>
+│  │  │  ├─ <head>
+│  │  │  ├─ <body>
+│  │  │  │  ├─ <div>
+│  │  │  │  │  ├─ #text "\n  "
+│  │  │  │  │  ├─ <span>
+│  │  │  │  │  │  ├─ #text "An inline inside a block."
+│  │  │  │  │  ├─ #text "\n  With some text in between\n  "
+│  │  │  │  │  ├─ <div>
+│  │  │  │  │  │  ├─ #text "Then a block."
+│  │  │  │  │  ├─ #text "\n  "
+│  │  │  │  │  ├─ <span>
+│  │  │  │  │  │  ├─ #text "An inline..."
+│  │  │  │  │  ├─ #text "\n  And more text.\n  "
+│  │  │  │  │  ├─ <div>
+│  │  │  │  │  │  ├─ #text "\n    And another block.\n  "
+│  │  │  │  │  ├─ #text "\n  And more text.\n  "
+│  │  │  │  │  ├─ <span>
+│  │  │  │  │  │  ├─ #text "Then an inline again"
+│  │  │  │  │  ├─ #text "\n"
+│  │  │  │  ├─ #text "\n"

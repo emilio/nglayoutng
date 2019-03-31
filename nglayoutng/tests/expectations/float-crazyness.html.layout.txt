@@ -1,15 +1,21 @@
 ┌ Layout tree
-│  ├─ Viewport (bfc)
+│  ├─ Block (bfc) (Viewport)
 │  │  ├─ Block
 │  │  │  ├─ Block
 │  │  │  │  ├─ Block
-│  │  │  │  │  ├─ Text { text: "\n  " }
-│  │  │  │  │  ├─ Text { text: "\n  " }
-│  │  │  │  │  ├─ Block
-│  │  │  │  │  │  ├─ Text { text: "\n    " }
-│  │  │  │  │  │  ├─ Block (oof) (bfc)
+│  │  │  │  │  ├─ Block (InlineInsideBlockWrapper)
 │  │  │  │  │  │  ├─ Text { text: "\n  " }
-│  │  │  │  │  ├─ Text { text: "\n  " }
+│  │  │  │  │  │  ├─ Text { text: "\n  " }
+│  │  │  │  │  ├─ Block
+│  │  │  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  │  │  │  ├─ Text { text: "\n    " }
+│  │  │  │  │  │  ├─ Block (oof) (bfc)
+│  │  │  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  │  │  │  ├─ Text { text: "\n  " }
+│  │  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  │  │  ├─ Text { text: "\n  " }
 │  │  │  │  │  ├─ Block (bfc)
+│  │  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  │  │  ├─ Text { text: "\n" }
+│  │  │  │  ├─ Block (InlineInsideBlockWrapper)
 │  │  │  │  │  ├─ Text { text: "\n" }
-│  │  │  │  ├─ Text { text: "\n" }

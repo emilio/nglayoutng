@@ -1,23 +1,17 @@
 ┌ Layout tree
-│  ├─ Viewport (bfc)
+│  ├─ Block (bfc) (Viewport)
 │  │  ├─ Block
 │  │  │  ├─ Block
 │  │  │  │  ├─ Inline
 │  │  │  │  │  ├─ Text { text: "\n  Outer inline.\n  " }
 │  │  │  │  │  ├─ Inline
 │  │  │  │  │  │  ├─ Text { text: "\n    My parent is an inline.\n    " }
-│  │  │  │  │  ├─ Text { text: "\n  Moar inlines\n  " }
-│  │  │  │  │  ├─ Inline
-│  │  │  │  │  │  ├─ Text { text: "And more inside the split" }
-│  │  │  │  │  ├─ Text { text: "\n" }
-│  │  │  │  ├─ Block (ib-split-wrapper)
-│  │  │  │  │  ├─ Block (ib-split-wrapper)
-│  │  │  │  │  │  ├─ Block
-│  │  │  │  │  │  │  ├─ Text { text: "\n      And mine is a block.\n    " }
-│  │  │  │  ├─ Inline
-│  │  │  │  │  ├─ Inline
 │  │  │  │  │  │  ├─ Text { text: "\n    More inline content here.\n    " }
 │  │  │  │  │  │  ├─ Inline
 │  │  │  │  │  │  │  ├─ Text { text: "Moar inline" }
 │  │  │  │  │  │  ├─ Text { text: "\n  " }
+│  │  │  │  │  ├─ Text { text: "\n  Moar inlines\n  " }
+│  │  │  │  │  ├─ Inline
+│  │  │  │  │  │  ├─ Text { text: "And more inside the split" }
+│  │  │  │  │  ├─ Text { text: "\n" }
 │  │  │  │  ├─ Text { text: "\nOutside split inline\n" }

@@ -10,6 +10,10 @@ use kuchiki::{self, NodeData, NodeRef};
 use std::collections::HashMap;
 use std::io::{self, Read};
 
+pub mod block;
+pub mod inline;
+// pub mod table;
+
 trait NodeMapHelpers<V> {
     fn for_node(&self, node: &kuchiki::Node) -> Option<&V>;
 }
@@ -201,13 +205,22 @@ impl LayoutTreeBuilder {
             None => return,
         };
 
-        let style = if node.as_text().is_some() {
+        let is_text = node.as_text().is_some();
+        let style = if is_text {
             let parent = node.parent().unwrap();
             self.styles.for_node(&parent)
         } else {
             self.styles.for_node(&node)
         }
         .expect("Node should be styled if we found an insertion point for it");
+
+        let text_style;
+        let style = if is_text {
+            text_style = style.inherited().finish(false);
+            &text_style
+        } else {
+            style
+        };
 
         let new_box = match self.construct_box_for(node, style, &insertion_point) {
             Some(node) => node,
@@ -219,7 +232,11 @@ impl LayoutTreeBuilder {
             },
         };
 
-        let id = self.layout_tree.insert(new_box, insertion_point);
+        let id = match self.layout_tree.insert(new_box, insertion_point) {
+            Some(id) => id,
+            None => return,
+        };
+
         self.principal_boxes.insert(&**node, id);
         self.insert_node_children(node);
     }

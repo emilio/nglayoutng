@@ -1,5 +1,5 @@
 ┌ Layout tree
-│  ├─ Viewport (bfc)
+│  ├─ Block (bfc) (Viewport)
 │  │  ├─ Block
 │  │  │  ├─ Block
 │  │  │  │  ├─ Block

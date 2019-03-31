@@ -1,13 +1,9 @@
 ┌ Layout tree
-│  ├─ Viewport (bfc)
+│  ├─ Block (bfc) (Viewport)
 │  │  ├─ Block
 │  │  │  ├─ Block
 │  │  │  │  ├─ Inline
 │  │  │  │  │  ├─ Text { text: "\n  My parent is an inline.\n  " }
-│  │  │  │  ├─ Block (ib-split-wrapper)
-│  │  │  │  │  ├─ Block
-│  │  │  │  │  │  ├─ Text { text: "\n    And mine is a block.\n  " }
-│  │  │  │  ├─ Inline
 │  │  │  │  │  ├─ Text { text: "\n  More inline content here.\n  " }
 │  │  │  │  │  ├─ Inline
 │  │  │  │  │  │  ├─ Text { text: "Moar inline" }

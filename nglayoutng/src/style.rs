@@ -198,7 +198,23 @@ pub enum PseudoElement {
     Before,
     After,
     Viewport,
+    /// An anonymous block wrapping inline contents.
+    InlineInsideBlockWrapper,
+    /// An anonymous block wrapping a block inserted inside an inline.
     BlockInsideInlineWrapper,
+}
+
+impl PseudoElement {
+    /// Returns whether this pseudo-style is for an anonymous box.
+    #[inline]
+    pub fn is_anonymous(self) -> bool {
+        match self {
+            PseudoElement::Before | PseudoElement::After => false,
+            PseudoElement::Viewport |
+            PseudoElement::InlineInsideBlockWrapper |
+            PseudoElement::BlockInsideInlineWrapper => true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -406,7 +422,12 @@ impl ComputedStyle {
         Self::new_anonymous(PseudoElement::BlockInsideInlineWrapper, Display::Block)
     }
 
+    pub fn for_inline_inside_block_wrapper() -> Self {
+        Self::new_anonymous(PseudoElement::InlineInsideBlockWrapper, Display::Block)
+    }
+
     pub fn new_anonymous(pseudo: PseudoElement, display: Display) -> Self {
+        debug_assert!(pseudo.is_anonymous());
         MutableComputedStyle {
             pseudo: Some(pseudo),
             display,

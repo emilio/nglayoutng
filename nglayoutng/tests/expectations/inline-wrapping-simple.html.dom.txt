@@ -1,0 +1,12 @@
+┌ DOM tree
+│  ├─ #document
+│  │  ├─ <!DOCTYPE html  >
+│  │  ├─ <html>
+│  │  │  ├─ <head>
+│  │  │  ├─ <body>
+│  │  │  │  ├─ <div>
+│  │  │  │  │  ├─ #text "\n  Text inside a block.\n  "
+│  │  │  │  │  ├─ <div>
+│  │  │  │  │  │  ├─ #text "\n    Which should get wrapped since there\'s another block.\n  "
+│  │  │  │  │  ├─ #text "\n  And more text.\n"
+│  │  │  │  ├─ #text "\n"
