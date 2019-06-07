@@ -4,7 +4,7 @@
 use html5ever::LocalName;
 use kuchiki::traits::*;
 use kuchiki::{self, NodeData, NodeRef};
-use misc::print_tree::PrintTree;
+use crate::misc::print_tree::PrintTree;
 use std::io::{self, Read};
 
 /// Parses a DOM tree using html5ever and returns the root.
@@ -45,7 +45,7 @@ pub fn print_dom(root: &NodeRef) {
 }
 
 /// Prints the dom to a particular output.
-pub fn print_dom_to(root: &NodeRef, dest: &mut ::std::io::Write) {
+pub fn print_dom_to(root: &NodeRef, dest: &mut dyn (::std::io::Write)) {
     let mut tree = PrintTree::new("DOM tree", dest);
     print_node(root, &mut tree);
 }

@@ -1,13 +1,13 @@
 pub mod builder;
 
 use self::builder::InsertionPoint;
-use allocator;
+use crate::allocator;
 use app_units::Au;
 use euclid::Size2D;
-use layout_algorithms::{ConstraintSpace, GenericLayoutResult, LayoutContext};
-use logical_geometry;
-use misc::print_tree::PrintTree;
-use style::{self, ComputedStyle, Display, PseudoElement};
+use crate::layout_algorithms::{ConstraintSpace, GenericLayoutResult, LayoutContext};
+use crate::logical_geometry;
+use crate::misc::print_tree::PrintTree;
+use crate::style::{self, ComputedStyle, Display, PseudoElement};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct LayoutNodeId(usize);
@@ -121,7 +121,7 @@ impl LayoutNode {
     /// > when that value has been propagated to the viewport) establish new
     /// > block formatting contexts for their contents.
     pub fn establishes_bfc(&self) -> bool {
-        use style::Overflow;
+        use crate::style::Overflow;
 
         // The root always establishes an (initial) BFC.
         if self.parent.is_none() {
@@ -637,7 +637,7 @@ impl LayoutTree {
     }
 
     /// Prints the layout tree to a particular output.
-    pub fn print_to(&self, dest: &mut ::std::io::Write) {
+    pub fn print_to(&self, dest: &mut dyn (::std::io::Write)) {
         let mut printer = PrintTree::new("Layout tree", dest);
         self[self.root].print(self, self.root, &mut printer);
     }

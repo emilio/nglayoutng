@@ -7,11 +7,11 @@
 
 use app_units::Au;
 use cssparser::{self, CowRcStr, Parser, ParserInput, Token};
-use logical_geometry::WritingMode;
+use crate::logical_geometry::WritingMode;
 use smallvec::SmallVec;
 use std::collections::HashMap;
 use std::rc::Rc;
-use style::{self, ComputedStyle, MutableComputedStyle};
+use crate::style::{self, ComputedStyle, MutableComputedStyle};
 
 #[derive(PropertyDeclaration)]
 pub enum PropertyDeclaration {
@@ -273,7 +273,7 @@ fn parse_length_or_percentage<'i>(
 }
 
 fn parse_size<'i>(input: &mut Parser<'i, '_>) -> Result<style::Size, ParseError<'i>> {
-    if let Ok(lop) = input.try(parse_length_or_percentage) {
+    if let Ok(lop) = input.try_parse(parse_length_or_percentage) {
         return Ok(style::Size::LengthPercentage(lop));
     }
     Ok(style::Size::Keyword(style::SizeKeyword::parse(input)?))
@@ -282,7 +282,7 @@ fn parse_size<'i>(input: &mut Parser<'i, '_>) -> Result<style::Size, ParseError<
 fn parse_length_or_percentage_or_auto<'i>(
     input: &mut Parser<'i, '_>,
 ) -> Result<style::LengthPercentageOrAuto, ParseError<'i>> {
-    if input.try(|i| i.expect_ident_matching("auto")).is_ok() {
+    if input.try_parse(|i| i.expect_ident_matching("auto")).is_ok() {
         return Ok(style::LengthPercentageOrAuto::Auto);
     }
     Ok(style::LengthPercentageOrAuto::LengthPercentage(
@@ -295,7 +295,7 @@ fn parse_overflow_shorthand<'i>(
 ) -> Result<SmallVec<[PropertyDeclaration; 1]>, ParseError<'i>> {
     let mut ret = SmallVec::new();
     let x = style::Overflow::parse(input)?;
-    let y = input.try(|i| style::Overflow::parse(i)).unwrap_or(x);
+    let y = input.try_parse(|i| style::Overflow::parse(i)).unwrap_or(x);
     ret.push(PropertyDeclaration::OverflowX(x));
     ret.push(PropertyDeclaration::OverflowY(y));
     Ok(ret)
@@ -310,21 +310,21 @@ fn parse_border<'i>(
     let mut any = false;
     loop {
         if color.is_none() {
-            if let Ok(value) = input.try(parse_color) {
+            if let Ok(value) = input.try_parse(parse_color) {
                 color = Some(value);
                 any = true;
                 continue;
             }
         }
         if style.is_none() {
-            if let Ok(value) = input.try(style::BorderStyle::parse) {
+            if let Ok(value) = input.try_parse(style::BorderStyle::parse) {
                 style = Some(value);
                 any = true;
                 continue;
             }
         }
         if width.is_none() {
-            if let Ok(value) = input.try(parse_length) {
+            if let Ok(value) = input.try_parse(parse_length) {
                 width = Some(value);
                 any = true;
                 continue;
@@ -371,9 +371,9 @@ where
 {
     let mut ret = SmallVec::new();
     let top = parse_one(input)?;
-    let right = input.try(parse_one).ok();
-    let bottom = input.try(parse_one).ok();
-    let left = input.try(parse_one).ok();
+    let right = input.try_parse(parse_one).ok();
+    let bottom = input.try_parse(parse_one).ok();
+    let left = input.try_parse(parse_one).ok();
 
     match (right, bottom, left) {
         (Some(right), Some(bottom), Some(left)) => {

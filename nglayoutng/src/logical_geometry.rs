@@ -9,7 +9,7 @@ use euclid::{Point2D, Rect, SideOffsets2D, Size2D};
 use std::cmp::{max, min};
 use std::fmt::{self, Debug, Error, Formatter};
 use std::ops::{Add, Sub};
-use style;
+use crate::style;
 
 pub enum BlockFlowDirection {
     TopToBottom,

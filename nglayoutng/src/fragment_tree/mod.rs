@@ -1,6 +1,6 @@
 use app_units::Au;
 use euclid::{Point2D, Size2D};
-use style::ComputedStyle;
+use crate::style::ComputedStyle;
 
 /// A child fragment contains a given fragment and an offset relative to the
 /// parent fragment.

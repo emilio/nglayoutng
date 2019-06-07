@@ -17,11 +17,11 @@ pub struct PrintTree<'a> {
     queued_item: Option<String>,
 
     /// The output where this pretty-printer will be stored.
-    output: &'a mut Write,
+    output: &'a mut dyn Write,
 }
 
 impl<'a> PrintTree<'a> {
-    pub fn new(title: &str, output: &'a mut Write) -> Self {
+    pub fn new(title: &str, output: &'a mut dyn Write) -> Self {
         writeln!(output, "\u{250c} {}", title).unwrap();
         Self {
             level: 1,

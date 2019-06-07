@@ -4,7 +4,7 @@
 
 use super::super::*;
 use super::*;
-use style::*;
+use crate::style::*;
 
 pub struct InlineInside;
 

@@ -1,4 +1,4 @@
-use cg;
+use crate::cg;
 use quote::Tokens;
 use syn::{DeriveInput, Ident, Path, Type};
 use synstructure;
@@ -91,10 +91,10 @@ pub fn derive(input: DeriveInput) -> Tokens {
 
             quote! {
                 let mut field = match style.writing_mode.#function_name() {
-                    ::logical_geometry::PhysicalSide::Left => &mut style.#left,
-                    ::logical_geometry::PhysicalSide::Right => &mut style.#right,
-                    ::logical_geometry::PhysicalSide::Top => &mut style.#top,
-                    ::logical_geometry::PhysicalSide::Bottom => &mut style.#bottom,
+                    crate::logical_geometry::PhysicalSide::Left => &mut style.#left,
+                    crate::logical_geometry::PhysicalSide::Right => &mut style.#right,
+                    crate::logical_geometry::PhysicalSide::Top => &mut style.#top,
+                    crate::logical_geometry::PhysicalSide::Bottom => &mut style.#bottom,
                 };
                 *field = #value;
             }
@@ -140,21 +140,21 @@ pub fn derive(input: DeriveInput) -> Tokens {
         impl #name {
             #[inline]
             fn parse_longhand<'i, 't>(
-                name: &::cssparser::CowRcStr<'i>,
-                input: &mut ::cssparser::Parser<'i, 't>,
+                name: &cssparser::CowRcStr<'i>,
+                input: &mut cssparser::Parser<'i, 't>,
             ) -> Result<Self, ParseError<'i>> {
                 let location = input.current_source_location();
                 match &**name {
                     #parse_body
                     _ => {
                         Err(location.new_custom_error(
-                            ::css::Error::UnknownPropertyName(name.clone())
+                            crate::css::Error::UnknownPropertyName(name.clone())
                         ))
                     }
                 }
             }
 
-            fn compute(&self, style: &mut ::style::MutableComputedStyle) {
+            fn compute(&self, style: &mut crate::style::MutableComputedStyle) {
                 match *self {
                     #compute_body
                 }

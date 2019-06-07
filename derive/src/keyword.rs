@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use cg;
+use crate::cg;
 use quote::Tokens;
 use syn::DeriveInput;
 use synstructure;
@@ -53,13 +53,13 @@ pub fn derive(input: DeriveInput) -> Tokens {
             /// Parse this keyword.
             #[inline]
             pub fn parse<'i, 't>(
-                input: &mut ::cssparser::Parser<'i, 't>,
-            ) -> Result<Self, ::css::ParseError<'i>> {
+                input: &mut cssparser::Parser<'i, 't>,
+            ) -> Result<Self, crate::css::ParseError<'i>> {
                 let location = input.current_source_location();
                 let ident = input.expect_ident()?;
                 Self::from_ident(ident.as_ref()).map_err(|()| {
                     location.new_unexpected_token_error(
-                        ::cssparser::Token::Ident(ident.clone())
+                        cssparser::Token::Ident(ident.clone())
                     )
                 })
             }

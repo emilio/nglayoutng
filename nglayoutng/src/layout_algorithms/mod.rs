@@ -3,10 +3,10 @@ pub mod block;
 
 use app_units::Au;
 use euclid::Size2D;
-use fragment_tree::ChildFragment;
+use crate::fragment_tree::ChildFragment;
 use html5ever::tree_builder::QuirksMode;
-use layout_tree::LayoutTree;
-use logical_geometry::{LogicalSize, WritingMode};
+use crate::layout_tree::LayoutTree;
+use crate::logical_geometry::{LogicalSize, WritingMode};
 
 /// A struct that contains global information about this layout pass.
 pub struct LayoutContext<'a> {
