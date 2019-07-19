@@ -164,8 +164,44 @@ impl LayoutNode {
         }
     }
 
-    fn is_containing_block_for(&self, _for_child: &Self) -> bool {
-        unimplemented!()
+    fn is_absolute_containing_block(&self) -> bool {
+        if self.is_fixed_containing_block() {
+            return true;
+        }
+
+        self.position() != style::Position::Static
+    }
+
+    fn is_fixed_containing_block(&self) -> bool {
+        if self.parent.is_none() {
+            return true;
+        }
+        // TODO(emilio): transform / will-change: transform /  filters, etc.
+        false
+    }
+
+    fn is_containing_block_for(&self, child: &Self) -> bool {
+        // ICB contains everything.
+        if self.parent.is_none() {
+            return true;
+        }
+
+        if self.is_fixed_containing_block() {
+            debug_assert!(self.is_absolute_containing_block());
+            return true;
+        }
+
+        if child.position() == style::Position::Fixed {
+            return false;
+        }
+
+        if child.is_out_of_flow_positioned() {
+            return self.is_absolute_containing_block();
+        }
+
+        // TODO(emilio): Gecko avoids returning true for ib-split wrappers,
+        // table rows and other junk.
+        self.is_block_container()
     }
 
     pub fn containing_block_chain<'tree>(
