@@ -67,11 +67,10 @@ impl LayoutNode {
 
     pub fn layout(
         &self,
-        _context: &LayoutContext,
+        context: &LayoutContext,
         _constraints: &ConstraintSpace,
     ) -> GenericLayoutResult {
-        // TODO
-        unimplemented!()
+        debug_assert!(context.layout_tree as *const _, self as *const _);
     }
 
     fn is_anonymous(&self) -> bool {
