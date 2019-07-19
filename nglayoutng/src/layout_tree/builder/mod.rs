@@ -1,9 +1,9 @@
 use super::{ContainerKind, LayoutNode, LayoutNodeId, LayoutNodeKind, LayoutTree, LeafKind};
-use app_units::Au;
 use crate::css;
 use crate::dom;
-use euclid::Size2D;
 use crate::style::{ComputedStyle, Display};
+use app_units::Au;
+use euclid::Size2D;
 
 use kuchiki::{self, NodeData, NodeRef};
 

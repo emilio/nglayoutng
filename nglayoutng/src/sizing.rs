@@ -1,7 +1,7 @@
-use app_units::Au;
 use crate::layout_algorithms::ConstraintSpace;
 use crate::logical_geometry::LogicalSize;
 use crate::style::{ComputedStyle, Size, SizeKeyword};
+use app_units::Au;
 
 /// A resolved size is either an automatic size, or an actual used value.
 #[derive(Clone, Copy, Debug, PartialEq)]

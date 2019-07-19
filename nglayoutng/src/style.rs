@@ -1,7 +1,7 @@
+use crate::logical_geometry::{self, LogicalMargin, LogicalSize};
 use app_units::Au;
 use cssparser::{Color, RGBA};
 use euclid::{SideOffsets2D, Size2D};
-use crate::logical_geometry::{self, LogicalMargin, LogicalSize};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
 pub enum Display {

@@ -2,12 +2,12 @@ pub mod builder;
 
 use self::builder::InsertionPoint;
 use crate::allocator;
-use app_units::Au;
-use euclid::Size2D;
 use crate::layout_algorithms::{ConstraintSpace, GenericLayoutResult, LayoutContext};
 use crate::logical_geometry;
 use crate::misc::print_tree::PrintTree;
 use crate::style::{self, ComputedStyle, Display, PseudoElement};
+use app_units::Au;
+use euclid::Size2D;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct LayoutNodeId(usize);

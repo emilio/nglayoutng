@@ -1,10 +1,10 @@
 //! These are little helpers that will help to get the layout tree builder up
 //! and running.
 
+use crate::misc::print_tree::PrintTree;
 use html5ever::LocalName;
 use kuchiki::traits::*;
 use kuchiki::{self, NodeData, NodeRef};
-use crate::misc::print_tree::PrintTree;
 use std::io::{self, Read};
 
 /// Parses a DOM tree using html5ever and returns the root.

@@ -5,13 +5,13 @@
 //! Also, it doesn't have any css-like error handling. Any syntax error reports
 //! an error and stops parsing entirely.
 
+use crate::logical_geometry::WritingMode;
+use crate::style::{self, ComputedStyle, MutableComputedStyle};
 use app_units::Au;
 use cssparser::{self, CowRcStr, Parser, ParserInput, Token};
-use crate::logical_geometry::WritingMode;
 use smallvec::SmallVec;
 use std::collections::HashMap;
 use std::rc::Rc;
-use crate::style::{self, ComputedStyle, MutableComputedStyle};
 
 #[derive(PropertyDeclaration)]
 pub enum PropertyDeclaration {
