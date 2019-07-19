@@ -1,6 +1,6 @@
 use crate::layout_algorithms::ConstraintSpace;
 use crate::logical_geometry::LogicalSize;
-use crate::style::{ComputedStyle, Size, SizeKeyword};
+use crate::style::ComputedStyle;
 use app_units::Au;
 
 /// A resolved size is either an automatic size, or an actual used value.
@@ -12,16 +12,19 @@ pub enum ResolvedSize {
 
 /// The min and max content sizes. These are always inline sizes.
 pub struct MinMaxSizes {
-    min_content: Au,
-    max_content: Au,
+    pub min_content: Au,
+    pub max_content: Au,
 }
 
 /// Computes the preferred size of a given box.
 pub fn pref_size(
-    style: &ComputedStyle,
-    constraints: &ConstraintSpace,
-    min_max: &MinMaxSizes,
+    _style: &ComputedStyle,
+    _constraints: &ConstraintSpace,
+    _min_max: &MinMaxSizes,
 ) -> LogicalSize<ResolvedSize> {
+    /*
+    use crate::style::{Size, SizeKeyword};
+
     let cb_size = constraints.cb_size().convert(
         constraints.containing_block_writing_mode,
         style.writing_mode,
@@ -47,4 +50,6 @@ pub fn pref_size(
     };
 
     LogicalSize::new(style.writing_mode, inline_size, block_size)
+     */
+    unimplemented!()
 }

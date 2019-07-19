@@ -42,8 +42,8 @@ pub fn derive(input: DeriveInput) -> Tokens {
                 }
 
                 #[inline]
-                fn #into_name(&self) -> Option<#ty> {
-                    match *self {
+                fn #into_name(self) -> Option<#ty> {
+                    match self {
                         #name::#variant_name(inner) => Some(inner),
                         _ => None,
                     }

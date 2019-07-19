@@ -5,7 +5,6 @@ use crate::fragment_tree::ChildFragment;
 use crate::layout_tree::LayoutTree;
 use crate::logical_geometry::{LogicalSize, WritingMode};
 use app_units::Au;
-use euclid::Size2D;
 use html5ever::tree_builder::QuirksMode;
 
 /// A struct that contains global information about this layout pass.
@@ -13,32 +12,40 @@ pub struct LayoutContext<'a> {
     /// The quirks mode of the document we're laying out.
     pub quirks_mode: QuirksMode,
 
-    /// The size of the initial containing block.
-    pub initial_containing_block_size: Size2D<Au>,
-
     /// The layout tree.
     pub layout_tree: &'a LayoutTree,
 }
 
-pub type AvailableSize = LogicalSize<Option<Au>>;
+pub struct AvailableSize(LogicalSize<Option<Au>>);
+
+impl std::ops::Deref for AvailableSize {
+    type Target = LogicalSize<Option<Au>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl AvailableSize {
+    pub fn definite(wm: WritingMode, size: LogicalSize<Au>) -> Self {
+        AvailableSize(LogicalSize::new(wm, Some(size.inline), Some(size.block)))
+    }
+
+    pub fn inline(&self) -> Au {
+        self.inline.expect("Should never have unconstrained available inline size")
+    }
+
+    pub fn unconstrained_block(wm: WritingMode, inline: Au) -> Self {
+        AvailableSize(LogicalSize::new(wm, Some(inline), None))
+    }
+}
 
 /// The constraints we're using for a given layout.
 pub struct ConstraintSpace {
     pub available_size: AvailableSize,
-
-    pub containing_block_size: Size2D<Au>,
+    pub percentage_resolution_size: AvailableSize,
     pub containing_block_writing_mode: WritingMode,
     // TODO(emilio): Sure we need to add more stuff here.
-}
-
-impl ConstraintSpace {
-    /// Returns the logical containing-block size.
-    pub fn cb_size(&self) -> LogicalSize<Au> {
-        LogicalSize::from_physical(
-            self.containing_block_writing_mode,
-            self.containing_block_size,
-        )
-    }
 }
 
 #[derive(BreakToken)]
@@ -78,7 +85,6 @@ pub trait LayoutAlgorithm {
 
     fn layout(
         &self,
-        context: &LayoutContext,
         constraints: &ConstraintSpace,
         break_token: Option<Self::BreakToken>,
     ) -> LayoutResult<Self::BreakToken>;

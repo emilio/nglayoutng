@@ -2,12 +2,15 @@ pub mod builder;
 
 use self::builder::InsertionPoint;
 use crate::allocator;
-use crate::layout_algorithms::{ConstraintSpace, GenericLayoutResult, LayoutContext};
-use crate::logical_geometry;
+use crate::fragment_tree::ChildFragment;
+use crate::layout_algorithms::{AvailableSize, ConstraintSpace, LayoutAlgorithm, LayoutContext};
+use crate::layout_algorithms::block::BlockFormattingContext;
+use crate::logical_geometry::{LogicalSize, WritingMode};
 use crate::misc::print_tree::PrintTree;
 use crate::style::{self, ComputedStyle, Display, PseudoElement};
 use app_units::Au;
 use euclid::Size2D;
+use html5ever::tree_builder::QuirksMode;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct LayoutNodeId(usize);
@@ -63,14 +66,6 @@ impl LayoutNode {
             next_sibling: None,
             kind,
         }
-    }
-
-    pub fn layout(
-        &self,
-        context: &LayoutContext,
-        _constraints: &ConstraintSpace,
-    ) -> GenericLayoutResult {
-        debug_assert!(context.layout_tree as *const _, self as *const _);
     }
 
     fn is_anonymous(&self) -> bool {
@@ -203,6 +198,14 @@ impl LayoutNode {
         self.is_block_container()
     }
 
+    pub fn expect_containing_block<'tree>(&'tree self, tree: &'tree LayoutTree) -> &'tree Self {
+        self.containing_block(tree).expect("Called expect_containing_block on the root?")
+    }
+
+    pub fn containing_block<'tree>(&'tree self, tree: &'tree LayoutTree) -> Option<&'tree Self> {
+        self.containing_block_chain(tree).next()
+    }
+
     pub fn containing_block_chain<'tree>(
         &'tree self,
         tree: &'tree LayoutTree,
@@ -267,7 +270,7 @@ impl LayoutNode {
         self.style.position
     }
 
-    pub fn writing_mode(&self) -> logical_geometry::WritingMode {
+    pub fn writing_mode(&self) -> WritingMode {
         self.style.writing_mode
     }
 
@@ -703,6 +706,34 @@ impl LayoutTree {
         let mut printer = PrintTree::new("Layout tree", dest);
         self[self.root].print(self, self.root, &mut printer);
     }
+
+    /// Actually runs layout on the tree!
+    pub fn layout(&self, quirks_mode: QuirksMode, viewport_size: Size2D<Au>) -> ChildFragment {
+        let context = LayoutContext {
+            quirks_mode,
+            layout_tree: self,
+        };
+
+        let root = self.root_node();
+        let wm = root.style.writing_mode;
+        let available_inline_size = if wm.is_vertical() {
+            viewport_size.height
+        } else {
+            viewport_size.width
+        };
+
+        let percentage_resolution_size = LogicalSize::from_physical(wm, viewport_size);
+        let constraints = ConstraintSpace {
+            available_size: AvailableSize::unconstrained_block(wm, available_inline_size),
+            percentage_resolution_size: AvailableSize::definite(wm, percentage_resolution_size),
+            containing_block_writing_mode: wm,
+        };
+
+        let result = BlockFormattingContext::new(&context, root).layout(&constraints, None);
+        assert!(result.break_token.is_none(), "How did we fragment with unconstrained block size?");
+        result.root_fragment
+    }
+
 }
 
 /// A simple iterator for the in-flow ancestors of a layout node.
