@@ -43,6 +43,8 @@ pub enum LayoutNodeKind {
 ///
 /// A display node is the primary box of an element, but contains no layout
 /// information, that's left to fragment.
+///
+/// This is the CSS2 concept of "box", minus dimensions.
 #[derive(Debug)]
 pub struct LayoutNode {
     pub style: ComputedStyle,
@@ -97,6 +99,8 @@ impl LayoutNode {
         }
     }
 
+    // 9.3 Positioning schemes
+
     pub fn is_floating(&self) -> bool {
         self.style.is_floating()
     }
@@ -143,12 +147,35 @@ impl LayoutNode {
         //
         // TODO: Maybe implement the 'has been propagated to the viewport'
         // thing.
+        //
+        // TODO: Overflow::Clip doesn't cause a bfc either afaict.
         if display.is_block_outside() && self.style.overflow_x != Overflow::Visible {
             return true;
         }
 
         // TODO(emilio): Columns and such, step by step...
         false
+    }
+
+    fn ancestors<'tree>(&self, tree: &'tree LayoutTree) -> AncestorIterator<'tree> {
+        AncestorIterator {
+            tree,
+            current: self.parent,
+        }
+    }
+
+    fn is_containing_block_for(&self, _for_child: &Self) -> bool {
+        unimplemented!()
+    }
+
+    pub fn containing_block_chain<'tree>(
+        &'tree self,
+        tree: &'tree LayoutTree,
+    ) -> ContainingBlockIterator<'tree> {
+        ContainingBlockIterator {
+            ancestors: self.ancestors(tree),
+            current: self,
+        }
     }
 
     fn print_label(&self, _id: LayoutNodeId) -> String {
@@ -640,6 +667,42 @@ impl LayoutTree {
     pub fn print_to(&self, dest: &mut dyn (::std::io::Write)) {
         let mut printer = PrintTree::new("Layout tree", dest);
         self[self.root].print(self, self.root, &mut printer);
+    }
+}
+
+/// A simple iterator for the in-flow ancestors of a layout node.
+pub struct AncestorIterator<'tree> {
+    tree: &'tree LayoutTree,
+    current: Option<LayoutNodeId>,
+}
+
+impl<'tree> Iterator for AncestorIterator<'tree> {
+    type Item = &'tree LayoutNode;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next = &self.tree[self.current?];
+        self.current = next.parent;
+        Some(next)
+    }
+}
+
+pub struct ContainingBlockIterator<'tree> {
+    ancestors: AncestorIterator<'tree>,
+    current: &'tree LayoutNode,
+}
+
+impl<'tree> Iterator for ContainingBlockIterator<'tree> {
+    type Item = &'tree LayoutNode;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let next = self.ancestors.next()?;
+            if !next.is_containing_block_for(self.current) {
+                continue;
+            }
+            self.current = next;
+            return Some(next);
+        }
     }
 }
 
