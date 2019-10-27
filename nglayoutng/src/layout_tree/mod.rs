@@ -715,7 +715,7 @@ impl LayoutTree {
         };
 
         let root = self.root_node();
-        let wm = root.style.writing_mode;
+        let wm = root.writing_mode();
         let available_inline_size = if wm.is_vertical() {
             viewport_size.height
         } else {
