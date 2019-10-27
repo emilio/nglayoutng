@@ -30,6 +30,11 @@ impl<'a, 'b> super::LayoutAlgorithm for BlockFormattingContext<'a, 'b> {
         _constraints: &ConstraintSpace,
         _break_token: Option<BreakToken>,
     ) -> LayoutResult {
+        if self.input_node.establishes_ifc(self.context.layout_tree) {
+            // self.layout_inline_children(_constraints, _break_token)
+        } else {
+            // self.layout_block_children(_constraints, _break_token)
+        }
         unimplemented!()
     }
 }

@@ -7,18 +7,6 @@ use crate::style::*;
 pub struct BlockInside;
 
 impl BlockInside {
-    /// Whether this node has any inline children.
-    ///
-    /// This is cheap to test since if we have any inline children, then all our
-    /// children have to be inline.
-    fn children_inline(tree: &LayoutTree, block: LayoutNodeId) -> bool {
-        let child = match tree[block].first_child() {
-            Some(c) => c,
-            None => return false,
-        };
-        tree[child].style.display.is_inline_outside()
-    }
-
     fn inline_wrapper(tree: &mut LayoutTree) -> LayoutNodeId {
         tree.alloc(LayoutNode::new_container(
             ComputedStyle::for_inline_inside_block_wrapper(),
@@ -123,16 +111,16 @@ impl BlockInside {
     ) -> Option<InsertionPoint> {
         assert!(tree[ip.parent].is_block_container());
         let has_children = tree[ip.parent].has_children();
-        let children_inline = has_children && Self::children_inline(tree, ip.parent);
+        let inline_formatting_context = has_children && tree[ip.parent].establishes_ifc(tree);
 
         // Easy case, we just need to insert in the right place, since we either
         // are an inline-formatting-context and we're inserting an inline, or we
         // have only non-inlines and we're inserting an inline.
-        if !has_children || children_inline == node.style.display.is_inline_outside() {
+        if !has_children || inline_formatting_context == node.style.display.is_inline_outside() {
             return Some(tree.legalize_insertion_point(ip));
         }
 
-        if children_inline {
+        if inline_formatting_context {
             return Some(Self::wrap_inlines_in_anon_blocks(tree, ip));
         }
 

@@ -151,6 +151,20 @@ impl LayoutNode {
         false
     }
 
+    /// Returns whether a node establishes an inline formatting context.
+    ///
+    /// This is, effectively, whether we're a block-of-inlines, and thus whether
+    /// any in-flow child is inline.
+    pub fn establishes_ifc(&self, tree: &LayoutTree) -> bool {
+        if !self.is_block_container() {
+            return false;
+        }
+        match self.in_flow_children(tree).next() {
+            Some(c) => c.style.display.is_inline_outside(),
+            None => false,
+        }
+    }
+
     fn ancestors<'tree>(&self, tree: &'tree LayoutTree) -> AncestorIterator<'tree> {
         AncestorIterator {
             tree,
