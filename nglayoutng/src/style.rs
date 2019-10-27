@@ -280,10 +280,13 @@ pub enum PseudoElement {
     Before,
     After,
     Viewport,
-    /// An anonymous block wrapping inline contents.
+    /// An anonymous block wrapping inline contents directly inside another
+    /// block.
     InlineInsideBlockWrapper,
     /// An anonymous block wrapping a block inserted inside an inline.
     BlockInsideInlineWrapper,
+    /// An anonymous inline box for the continuation of an inline.
+    InlineContinuation,
 }
 
 impl PseudoElement {
@@ -294,6 +297,7 @@ impl PseudoElement {
             PseudoElement::Before | PseudoElement::After => false,
             PseudoElement::Viewport |
             PseudoElement::InlineInsideBlockWrapper |
+            PseudoElement::InlineContinuation |
             PseudoElement::BlockInsideInlineWrapper => true,
         }
     }
@@ -500,7 +504,7 @@ impl ComputedStyle {
         Self::new_anonymous(PseudoElement::Viewport, Display::block())
     }
 
-    pub fn for_ib_split_wrapper() -> Self {
+    pub fn for_ib_split_block_wrapper() -> Self {
         Self::new_anonymous(PseudoElement::BlockInsideInlineWrapper, Display::block())
     }
 

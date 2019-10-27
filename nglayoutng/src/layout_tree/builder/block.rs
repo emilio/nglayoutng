@@ -100,6 +100,19 @@ impl BlockInside {
         None
     }
 
+    /// Removes from a non-anonymous block.
+    pub fn detach(
+        tree: &mut LayoutTree,
+        parent: LayoutNodeId,
+        node_to_remove: LayoutNodeId,
+    ) -> InsertionPoint {
+        assert!(!tree[parent].is_anonymous());
+
+        // TODO(emilio): Merge / remove anon boxes as needed if the node removed
+        // is a block that is around two blocks-wrapping-inlines.
+        tree.detach_unchecked(node_to_remove).unwrap()
+    }
+
     /// Processes an insertion inside a block-inside container, and returns the
     /// new insertion point. Note that the effective child under this could be
     /// something else than `node` (if it gets wrapped due to it being an

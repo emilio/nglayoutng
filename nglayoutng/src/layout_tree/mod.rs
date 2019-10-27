@@ -3,6 +3,7 @@ pub mod builder;
 use self::builder::InsertionPoint;
 use crate::allocator;
 use crate::fragment_tree::ChildFragment;
+use crate::layout_tree::builder::{inline::InlineInside, block::BlockInside};
 use crate::layout_algorithms::{AvailableSize, ConstraintSpace, LayoutAlgorithm, LayoutContext};
 use crate::layout_algorithms::block::BlockFormattingContext;
 use crate::logical_geometry::{LogicalSize, WritingMode};
@@ -502,10 +503,9 @@ impl LayoutTree {
         );
         let container_kind = self[ip.parent].container_kind()?;
         let ip = match container_kind {
-            ContainerKind::Inline => builder::inline::InlineInside::insertion(self, &node, ip)?,
-            ContainerKind::Block => builder::block::BlockInside::insertion(self, &node, ip)?,
+            ContainerKind::Inline => InlineInside::insertion(self, &node, ip)?,
+            ContainerKind::Block => BlockInside::insertion(self, &node, ip)?,
         };
-        // TODO: add table wrappers as needed.
         let id = self.alloc(node);
         self.insert_unchecked(id, ip);
         Some(id)
@@ -654,17 +654,55 @@ impl LayoutTree {
         self.assert_subtree_consistent(ip.parent);
     }
 
-    pub fn destroy(&mut self, node_to_remove: LayoutNodeId) {
-        // TODO(emilio): This would have to clean up fragments and such from
-        // other places.
-        let mut removed_node = self.nodes.deallocate(node_to_remove.0);
+    /// Detaches a node from the tree, without detaching its children or
+    /// deallocating the node.
+    ///
+    /// NOTE: This leaks if the node is not re-inserted or de-allocated, and the
+    /// node doesn't lose its identity.
+    ///
+    /// Returns the right insertion point position for the removed node, in
+    /// order to be in the same position if re-inserted there via insert().
+    pub fn detach(&mut self, node_to_remove: LayoutNodeId) -> InsertionPoint {
+        let parent = self[node_to_remove].parent.expect("Detaching the root not supported");
+        if self[parent].is_anonymous() {
+            let pseudo = self[parent].style.pseudo.unwrap();
+            return match pseudo {
+                PseudoElement::Viewport => self.detach_unchecked(node_to_remove).unwrap(),
+                PseudoElement::BlockInsideInlineWrapper => {
+                    InlineInside::detach_from_ib_split_block_wrapper(self, parent, node_to_remove)
+                }
+                PseudoElement::InlineContinuation => {
+                    // InlineInside::remove_from_inline_continuation(self, parent, node_to_remove);
+                    unimplemented!()
+                },
+                PseudoElement::InlineInsideBlockWrapper => {
+                    // BlockInside::detach_from_inline_wrapper(self, parent, node_to_remove)
+                    unimplemented!()
+                }
+                PseudoElement::Before | PseudoElement::After => {
+                    unreachable!("These are not anonymous boxes")
+                }
+            };
+        }
+
+        match self[parent].container_kind().unwrap() {
+            ContainerKind::Block => BlockInside::detach(self, parent, node_to_remove),
+            ContainerKind::Inline => InlineInside::detach(self, parent, node_to_remove),
+        }
+    }
+
+    pub fn detach_unchecked(&mut self, node_to_remove: LayoutNodeId) -> Option<InsertionPoint> {
+        let (prev_sibling, parent, next_sibling) = {
+            let node = &mut self[node_to_remove];
+            (node.prev_sibling.take(), node.parent.take(), node.next_sibling.take())
+        };
 
         // Fix up the tree.
-        if let Some(prev_sibling) = removed_node.prev_sibling {
+        if let Some(prev_sibling) = prev_sibling {
             let prev_sibling = &mut self[prev_sibling];
             assert_eq!(prev_sibling.next_sibling, Some(node_to_remove));
-            prev_sibling.next_sibling = removed_node.next_sibling;
-        } else if let Some(parent) = removed_node.parent {
+            prev_sibling.next_sibling = next_sibling;
+        } else if let Some(parent) = parent {
             let parent = &mut self[parent];
             assert_eq!(parent.first_child(), Some(node_to_remove));
             match parent.kind {
@@ -672,42 +710,55 @@ impl LayoutTree {
                     ref mut first_child,
                     ..
                 } => {
-                    *first_child = removed_node.next_sibling;
+                    *first_child = next_sibling;
                 },
                 LayoutNodeKind::Leaf { .. } => unreachable!(),
             }
         }
 
-        if let Some(next_sibling) = removed_node.next_sibling {
+        if let Some(next_sibling) = next_sibling {
             let next_sibling = &mut self[next_sibling];
             assert_eq!(next_sibling.prev_sibling, Some(node_to_remove));
-            next_sibling.prev_sibling = removed_node.prev_sibling;
-        } else if let Some(parent) = removed_node.parent {
+            next_sibling.prev_sibling = prev_sibling;
+        } else if let Some(parent) = parent {
             let parent = &mut self[parent];
             assert_eq!(parent.last_child(), Some(node_to_remove));
             match parent.kind {
                 LayoutNodeKind::Container {
                     ref mut last_child, ..
                 } => {
-                    *last_child = removed_node.prev_sibling;
+                    *last_child = prev_sibling;
                 },
                 LayoutNodeKind::Leaf { .. } => unreachable!(),
             }
         }
 
-        // TODO(emilio): We may want / need the children to have access to the
-        // parent chain, when we come up with something for OOFs, in which case
-        // we should clean it up at the end of this function.
-        removed_node.next_sibling = None;
-        removed_node.prev_sibling = None;
-        removed_node.parent = None;
+        parent.map(|parent| {
+            InsertionPoint {
+                parent,
+                prev_sibling,
+            }
+        })
+    }
 
-        // Now recursively tear down the children.
-        let mut child = removed_node.first_child();
+    pub fn destroy(&mut self, node_to_remove: LayoutNodeId) {
+        // Recursively tear down the children.
+        let mut child = self[node_to_remove].first_child();
         while let Some(child_to_remove) = child.take() {
             child = self[child_to_remove].next_sibling;
             self.destroy(child_to_remove);
         }
+
+        // Detach the node from the tree.
+        self.detach_unchecked(node_to_remove);
+
+        // And de-allocate the node.
+        let removed_node = self.nodes.deallocate(node_to_remove.0);
+        assert_eq!(removed_node.next_sibling, None);
+        assert_eq!(removed_node.prev_sibling, None);
+        assert_eq!(removed_node.parent, None);
+        assert_eq!(removed_node.first_child(), None);
+        assert_eq!(removed_node.last_child(), None);
     }
 
     /// Prints the layout tree to stdout.
@@ -747,7 +798,13 @@ impl LayoutTree {
         assert!(result.break_token.is_none(), "How did we fragment with unconstrained block size?");
         result.root_fragment
     }
+}
 
+impl Drop for LayoutTree {
+    fn drop(&mut self) {
+        self.destroy(self.root);
+        assert!(self.nodes.is_empty(), "Leaked detached nodes");
+    }
 }
 
 /// A simple iterator for the in-flow ancestors of a layout node.
