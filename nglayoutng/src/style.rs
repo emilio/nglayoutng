@@ -3,37 +3,119 @@ use app_units::Au;
 use cssparser::{Color, RGBA};
 use euclid::{SideOffsets2D, Size2D};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
-pub enum Display {
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum DisplayInside {
+    None,
+    Flow,
+    FlowRoot,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum DisplayOutside {
     None,
     Contents,
     Block,
-    FlowRoot,
     Inline,
-    InlineBlock,
     // ..
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct Display {
+    outside: DisplayOutside,
+    inside: DisplayInside,
+    is_list_item: bool,
+}
+
 impl Display {
+    fn new_list_item(outside: DisplayOutside, inside: DisplayInside, is_list_item: bool) -> Self {
+        Self { outside, inside, is_list_item }
+    }
+
+    fn new(outside: DisplayOutside, inside: DisplayInside) -> Self {
+        Self::new_list_item(outside, inside, false)
+    }
+
+    fn block() -> Self {
+        Self::new(DisplayOutside::Block, DisplayInside::Flow)
+    }
+
+    fn inline() -> Self {
+        Self::new(DisplayOutside::Inline, DisplayInside::Flow)
+    }
+
+    pub fn parse<'i, 't>(
+        input: &mut cssparser::Parser<'i, 't>,
+    ) -> Result<Self, crate::css::ParseError<'i>> {
+        let location = input.current_source_location();
+        let ident = input.expect_ident()?;
+        // TODO(emilio): Multi-keyword syntax.
+        Ok(match_ignore_ascii_case! { ident,
+            "contents" => Self::new(DisplayOutside::Contents, DisplayInside::None),
+            "none" => Self::new(DisplayOutside::None, DisplayInside::None),
+            "block" => Self::block(),
+            "inline" => Self::inline(),
+            "flow-root" => Self::new(DisplayOutside::Block, DisplayInside::FlowRoot),
+            "inline-block" => Self::new(DisplayOutside::Inline, DisplayInside::FlowRoot),
+            "list-item" => Self::new_list_item(DisplayOutside::Block, DisplayInside::Flow, true),
+            _ => return Err(location.new_unexpected_token_error(
+                cssparser::Token::Ident(ident.clone())
+            )),
+        })
+    }
+
+    pub fn inside(&self) -> DisplayInside {
+        self.inside
+    }
+
+    pub fn outside(&self) -> DisplayOutside {
+        self.outside
+    }
+
+    pub fn is_list_item(&self) -> bool {
+        self.is_list_item
+    }
+
+    pub fn is_none(&self) -> bool {
+        self.outside() == DisplayOutside::None
+    }
+
+    pub fn is_contents(&self) -> bool {
+        self.outside() == DisplayOutside::Contents
+    }
+
+    pub fn is_inline_inside(&self) -> bool {
+        self.outside() == DisplayOutside::Inline &&
+            self.inside() == DisplayInside::Flow
+    }
+
     pub fn is_block_outside(self) -> bool {
-        match self {
-            Display::Block | Display::FlowRoot => true,
-            Display::None | Display::Contents | Display::InlineBlock | Display::Inline => false,
+        match self.outside() {
+            DisplayOutside::Block => true,
+            DisplayOutside::None | DisplayOutside::Contents | DisplayOutside::Inline => false,
         }
     }
 
     pub fn is_inline_outside(self) -> bool {
-        match self {
-            Display::None | Display::Contents | Display::Block | Display::FlowRoot => false,
-            Display::InlineBlock | Display::Inline => true,
+        match self.outside() {
+            DisplayOutside::None | DisplayOutside::Contents | DisplayOutside::Block => false,
+            DisplayOutside::Inline => true,
         }
     }
 
     fn blockify(self) -> Self {
-        match self {
-            Display::Block | Display::FlowRoot | Display::None | Display::Contents => self,
-            Display::InlineBlock | Display::Inline => Display::Block,
-        }
+        let outside = match self.outside() {
+            DisplayOutside::Block | DisplayOutside::Contents | DisplayOutside::None => return self,
+            DisplayOutside::Inline => DisplayOutside::Block,
+        };
+
+        let inside = match self.inside() {
+            // inline-block blockifies to block, not to flow-root, for legacy
+            // reasons.
+            DisplayInside::FlowRoot => DisplayInside::Flow,
+            inside => inside,
+        };
+
+        Self::new_list_item(outside, inside, self.is_list_item())
     }
 }
 
@@ -353,8 +435,8 @@ impl ComputedStyle {
             direction,
             computed_writing_mode: writing_mode,
             text_orientation,
-            display: Display::Inline,
-            original_display: Display::Inline,
+            display: Display::inline(),
+            original_display: Display::inline(),
             position: Position::Static,
             box_sizing: BoxSizing::ContentBox,
             float: Float::None,
@@ -415,15 +497,15 @@ impl ComputedStyle {
     }
 
     pub fn for_viewport() -> Self {
-        Self::new_anonymous(PseudoElement::Viewport, Display::Block)
+        Self::new_anonymous(PseudoElement::Viewport, Display::block())
     }
 
     pub fn for_ib_split_wrapper() -> Self {
-        Self::new_anonymous(PseudoElement::BlockInsideInlineWrapper, Display::Block)
+        Self::new_anonymous(PseudoElement::BlockInsideInlineWrapper, Display::block())
     }
 
     pub fn for_inline_inside_block_wrapper() -> Self {
-        Self::new_anonymous(PseudoElement::InlineInsideBlockWrapper, Display::Block)
+        Self::new_anonymous(PseudoElement::InlineInsideBlockWrapper, Display::block())
     }
 
     pub fn new_anonymous(pseudo: PseudoElement, display: Display) -> Self {

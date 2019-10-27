@@ -7,7 +7,7 @@ use crate::layout_algorithms::{AvailableSize, ConstraintSpace, LayoutAlgorithm, 
 use crate::layout_algorithms::block::BlockFormattingContext;
 use crate::logical_geometry::{LogicalSize, WritingMode};
 use crate::misc::print_tree::PrintTree;
-use crate::style::{self, ComputedStyle, Display, PseudoElement};
+use crate::style::{self, ComputedStyle, Display, DisplayInside, PseudoElement};
 use app_units::Au;
 use euclid::Size2D;
 use html5ever::tree_builder::QuirksMode;
@@ -132,7 +132,7 @@ impl LayoutNode {
 
         // These always stablish a new bfc.
         let display = self.display();
-        if display == Display::InlineBlock || display == Display::FlowRoot {
+        if display.inside() == DisplayInside::FlowRoot {
             return true;
         }
 
