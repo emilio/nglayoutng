@@ -25,3 +25,7 @@ Layout in parallel?
  * ng_exclusion_space.cc: Float positioning and co. Shelves algorithm exploiting
    floats' properties.
 
+## Some fun cases
+
+ * https://bugs.webkit.org/show_bug.cgi?id=208112 has interesting float
+   test-cases.
