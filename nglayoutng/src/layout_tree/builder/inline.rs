@@ -9,11 +9,18 @@ use crate::style::*;
 pub struct InlineInside;
 
 impl InlineInside {
-    fn block_wrapper(tree: &mut LayoutTree) -> LayoutNodeId {
-        tree.alloc(LayoutNode::new_container(
+    fn inline_continuation(tree: &LayoutTree, of: LayoutNodeId) -> LayoutNode {
+        // TODO(emilio): Should we somehow tag it as anonymous? Can we
+        // otherwise know when to tear it down?
+        let style = tree[of].style.clone();
+        LayoutNode::new_container(style, ContainerKind::Inline)
+    }
+
+    fn block_wrapper() -> LayoutNode {
+        LayoutNode::new_container(
             ComputedStyle::for_ib_split_block_wrapper(),
             ContainerKind::Block,
-        ))
+        )
     }
 
     fn is_already_split(tree: &LayoutTree, inline: LayoutNodeId) -> bool {
@@ -64,9 +71,54 @@ impl InlineInside {
         tree.detach_unchecked(node_to_remove).unwrap()
     }
 
-    /// Ensures that an inline is set up so that we can contain blocks, that is:
-    ///
-    ///  * Wraps the inline itself inside an ano
+    fn legalize_insertion_point(tree: &LayoutTree, ip: InsertionPoint) -> InsertionPoint {
+        assert!(tree[ip.parent].is_inline());
+
+        let InsertionPoint {
+            mut parent,
+            prev_sibling,
+        } = ip;
+        let mut prev_sibling = match prev_sibling {
+            Some(s) => s,
+            None => return ip,
+        };
+
+        loop {
+            let maybe_parent = tree[prev_sibling].parent.unwrap();
+            if maybe_parent == parent {
+                break;
+            }
+
+            if tree[maybe_parent].is_inline() {
+                parent = maybe_parent;
+                break;
+            }
+
+            let pseudo = tree[maybe_parent].style.pseudo.expect("Expected an anonymous box");
+            assert_eq!(pseudo, PseudoElement::BlockInsideInlineWrapper);
+
+            // Insert in the following inline, which must be inside an
+            // InlineInsideBlock wrapper managed by the containing block.
+            let next_sibling =
+                tree[maybe_parent].next_sibling.expect("There should always be a trailing inline in a block-inside wrapper");
+
+            assert_eq!(tree[next_sibling].style.pseudo, Some(PseudoElement::InlineInsideBlockWrapper));
+
+            let next_sibling_first_child = tree[next_sibling].first_child().expect("There should always be a trailing inline-inside-inline");
+            assert!(tree[next_sibling_first_child].is_inline());
+
+            return InsertionPoint {
+                parent: next_sibling_first_child,
+                prev_sibling: None,
+            };
+        }
+
+
+        InsertionPoint {
+            parent,
+            prev_sibling: Some(prev_sibling),
+        }
+    }
 
     /// Inserts a node inside an inline-inside container.
     pub fn insertion(
@@ -76,31 +128,67 @@ impl InlineInside {
     ) -> Option<InsertionPoint> {
         assert!(tree[ip.parent].is_inline());
         assert!(!tree[ip.parent].is_anonymous());
-        // Easy case: we're not inserting a block inside an inline.
+        // Easy case: we're not inserting a block inside an inline, we just need
+        // to find the right continuation to append to, if any.
         if !node.style.display.is_block_outside() {
-            return Some(tree.legalize_insertion_point(ip));
+            return Some(Self::legalize_insertion_point(tree, ip));
         }
 
-        if let Some(prev_sibling) = ip.prev_sibling {
-            // If our previous sibling is also block-outside, then we're good
-            // too, as we have the right container necessarily.
-            if tree[prev_sibling].style.display.is_block_outside() {
-                let parent = tree[prev_sibling].parent.unwrap();
-                return Some(InsertionPoint {
-                    parent,
-                    prev_sibling: Some(prev_sibling),
-                });
+        let continuation_to_split = match ip.prev_sibling {
+            Some(prev_sibling) => tree[prev_sibling].parent.unwrap(),
+            None => ip.parent,
+        };
+
+        // Assert the thing is actually a continuation of ours.
+        if cfg!(debug_assertions) {
+            let mut current = Some(continuation_to_split);
+            let mut found = false;
+            while let Some(cur) = current {
+                assert!(tree[cur].is_inline() || tree[cur].style.pseudo == Some(PseudoElement::BlockInsideInlineWrapper));
+                if cur == ip.parent {
+                    found = true;
+                    break;
+                }
+                current = tree[cur].prev_sibling;
             }
-
-
-
-            // Otherwise we need to find the wrapper of our next sibling or
-            // create it if any.
-            // Self::find_or_insert_block_wrapper_after(tree, prev_sibling)
+            assert!(found, "Didn't found continuation of ib-split");
         }
 
-        // unimplemented!("IB Split fun")
+        // We're going to need a block wrapper and an inline continuation for
+        // this. Behold.
+        let grandparent = tree[ip.parent].parent.unwrap();
+        let block_wrapper = {
+            let wrapper = Self::block_wrapper();
+            let insertion_point = InsertionPoint {
+                parent: grandparent,
+                prev_sibling: Some(continuation_to_split),
+            };
+            // Note that this takes care of splitting ancestor inlines as
+            // needed.
+            tree.insert(wrapper, insertion_point).unwrap()
+        };
 
-        None
+        println!("Created block wrapper for {:?}", ip.parent);
+        tree.print_with_ids();
+
+        let continuation = {
+            let continuation = Self::inline_continuation(tree, ip.parent);
+            let insertion_point = InsertionPoint {
+                parent: grandparent,
+                prev_sibling: Some(block_wrapper),
+            };
+            tree.insert(continuation, insertion_point).unwrap()
+        };
+
+        println!("Created block wrapper and continuation for {:?}", ip.parent);
+        tree.print_with_ids();
+
+
+        tree.move_children_to(continuation_to_split, continuation, ip.prev_sibling);
+
+        Some(InsertionPoint {
+            parent: block_wrapper,
+            prev_sibling: None,
+        })
     }
 }

@@ -2,10 +2,16 @@
 │  ├─ Block (bfc) (Viewport)
 │  │  ├─ Block
 │  │  │  ├─ Block
-│  │  │  │  ├─ Inline
-│  │  │  │  │  ├─ Text { text: "\n  My parent is an inline.\n  " }
-│  │  │  │  │  ├─ Text { text: "\n  More inline content here.\n  " }
+│  │  │  │  ├─ Block (InlineInsideBlockWrapper)
 │  │  │  │  │  ├─ Inline
-│  │  │  │  │  │  ├─ Text { text: "Moar inline" }
-│  │  │  │  │  ├─ Text { text: "\n" }
-│  │  │  │  ├─ Text { text: "\nOutside split inline\n" }
+│  │  │  │  │  │  ├─ Text { text: "\n  My parent is an inline.\n  " }
+│  │  │  │  │  ├─ Text { text: "\nOutside split inline\n" }
+│  │  │  │  ├─ Block (BlockInsideInlineWrapper)
+│  │  │  │  │  ├─ Block
+│  │  │  │  │  │  ├─ Text { text: "\n    And mine is a block.\n  " }
+│  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  │  ├─ Inline
+│  │  │  │  │  │  ├─ Text { text: "\n  More inline content here.\n  " }
+│  │  │  │  │  │  ├─ Inline
+│  │  │  │  │  │  │  ├─ Text { text: "Moar inline" }
+│  │  │  │  │  │  ├─ Text { text: "\n" }

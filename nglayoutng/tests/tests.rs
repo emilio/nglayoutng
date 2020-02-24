@@ -3,6 +3,7 @@ extern crate nglayoutng;
 
 use nglayoutng::dom;
 use nglayoutng::layout_tree::builder::{LayoutTreeBuilder, LayoutTreeBuilderResult};
+use nglayoutng::layout_tree::PrintId;
 use std::fs::{self, File};
 use std::io::{Cursor, Write};
 use std::path::Path;
@@ -43,7 +44,7 @@ fn compare_with_reference(
     };
     let layout = {
         let mut layout = Cursor::new(Vec::new());
-        result.layout_tree.print_to(&mut layout);
+        result.layout_tree.print_to(&mut layout, PrintId::No);
         String::from_utf8(layout.into_inner()).unwrap()
     };
 

@@ -42,6 +42,12 @@ pub enum LayoutNodeKind {
     },
 }
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum PrintId {
+    No,
+    Yes,
+}
+
 /// A display node is a node in the display tree, which contains the primary box
 /// of each element.
 ///
@@ -85,6 +91,10 @@ impl LayoutNode {
     pub fn is_inline(&self) -> bool {
         self.container_kind()
             .map_or(false, |k| k == ContainerKind::Inline)
+    }
+
+    pub fn is_inline_continuation(&self, tree: &LayoutTree) -> bool {
+        self.is_inline() && self.prev_sibling.map_or(false, |sibling| tree[sibling].style.pseudo == Some(PseudoElement::BlockInsideInlineWrapper))
     }
 
     fn container_kind(&self) -> Option<ContainerKind> {
@@ -231,13 +241,15 @@ impl LayoutNode {
         }
     }
 
-    fn print_label(&self, _id: LayoutNodeId) -> String {
+    fn print_label(&self, id: LayoutNodeId, print_id: PrintId) -> String {
         let mut label = match self.kind {
             LayoutNodeKind::Container { ref kind, .. } => format!("{:?}", kind),
             LayoutNodeKind::Leaf { ref kind } => format!("{:?}", kind),
         };
 
-        // label.push_str(&format!(" - {:?}", _id));
+        if print_id == PrintId::Yes {
+            label.push_str(&format!(" - {:?}", id));
+        }
 
         if self.is_out_of_flow() {
             label.push_str(" (oof)");
@@ -254,10 +266,10 @@ impl LayoutNode {
         label
     }
 
-    fn print(&self, tree: &LayoutTree, id: LayoutNodeId, printer: &mut PrintTree) {
-        printer.new_level(self.print_label(id));
+    fn print(&self, tree: &LayoutTree, id: LayoutNodeId, printer: &mut PrintTree, print_id: PrintId) {
+        printer.new_level(self.print_label(id, print_id));
         for (id, child) in self.children_and_id(tree) {
-            child.print(tree, id, printer);
+            child.print(tree, id, printer, print_id);
         }
         printer.end_level();
     }
@@ -312,7 +324,7 @@ impl LayoutNode {
         Some(&tree[self.next_sibling?])
     }
 
-    pub fn prev_sibling_id<'tree>(&self, tree: &'tree LayoutTree) -> Option<&'tree LayoutNode> {
+    pub fn prev_sibling<'tree>(&self, tree: &'tree LayoutTree) -> Option<&'tree LayoutNode> {
         Some(&tree[self.prev_sibling?])
     }
 
@@ -362,6 +374,28 @@ impl LayoutNode {
     ) -> impl Iterator<Item = &'tree LayoutNode> {
         self.children(tree).filter(|c| c.is_in_flow())
     }
+
+    pub fn prev_siblings_and_id<'tree>(
+        &self,
+        tree: &'tree LayoutTree,
+    ) -> impl Iterator<Item = (LayoutNodeId, &'tree LayoutNode)> {
+        Children {
+            current: self.prev_sibling,
+            tree,
+            get_next: |node| node.prev_sibling,
+        }
+    }
+
+    pub fn following_siblings_and_id<'tree>(
+        &self,
+        tree: &'tree LayoutTree,
+    ) -> impl Iterator<Item = (LayoutNodeId, &'tree LayoutNode)> {
+        Children {
+            current: self.next_sibling,
+            tree,
+            get_next: |node| node.next_sibling,
+        }
+    }
 }
 
 /// An iterator over all the children of a node.
@@ -407,6 +441,23 @@ impl LayoutTree {
 
     pub fn assert_consistent(&self) {
         self.assert_subtree_consistent(self.root);
+    }
+
+    fn last_inline_continuation(&self, inline: LayoutNodeId) -> LayoutNodeId {
+        // IB splits have a structure like:
+        // Containing block
+        //   InlineInsideBlockWrapper
+        //     Inline
+        //       some content...
+        //   BlockInsideInlineWrapper
+        //     Block content...
+        //   InlineInsideBlockWrapper
+        //     Inline
+        //       some more...
+        assert!(self[inline].is_inline());
+        // self[inline].parent()
+        // unimplemented!()
+        return inline;
     }
 
     fn assert_subtree_consistent(&self, root: LayoutNodeId) {
@@ -496,7 +547,6 @@ impl LayoutTree {
     }
 
     pub fn insert(&mut self, node: LayoutNode, ip: InsertionPoint) -> Option<LayoutNodeId> {
-        debug_assert!(!node.is_anonymous());
         debug_assert!(
             !self[ip.parent].is_anonymous() ||
                 self[ip.parent].style.pseudo == Some(PseudoElement::Viewport),
@@ -568,35 +618,6 @@ impl LayoutTree {
                 },
             };
             self.insert_unchecked(child, ip);
-        }
-    }
-
-    /// For a given insertion point of non-anonymous nodes, find the actual
-    /// insertion point that we should use, by adjusting the previous sibling in
-    /// order to "escape" from any anonymous wrapper, or walk outside of our
-    /// ib-split continuations.
-    ///
-    /// TODO(emilio): Maybe find a better name for this?
-    pub fn legalize_insertion_point(&self, ip: InsertionPoint) -> InsertionPoint {
-        let InsertionPoint {
-            parent,
-            prev_sibling,
-        } = ip;
-        let mut prev_sibling = match prev_sibling {
-            Some(s) => s,
-            None => return ip,
-        };
-        loop {
-            let maybe_parent = self[prev_sibling].parent.unwrap();
-            if maybe_parent == parent {
-                break;
-            }
-            assert!(self[maybe_parent].is_anonymous());
-            prev_sibling = maybe_parent;
-        }
-        InsertionPoint {
-            parent,
-            prev_sibling: Some(prev_sibling),
         }
     }
 
@@ -761,15 +782,20 @@ impl LayoutTree {
         assert_eq!(removed_node.last_child(), None);
     }
 
+    /// Prints the layout tree to stdout with ids.
+    pub fn print_with_ids(&self) {
+        self.print_to(&mut std::io::stdout(), PrintId::Yes);
+    }
+
     /// Prints the layout tree to stdout.
     pub fn print(&self) {
-        self.print_to(&mut ::std::io::stdout());
+        self.print_to(&mut std::io::stdout(), PrintId::No);
     }
 
     /// Prints the layout tree to a particular output.
-    pub fn print_to(&self, dest: &mut dyn (::std::io::Write)) {
+    pub fn print_to(&self, dest: &mut dyn std::io::Write, print_id: PrintId) {
         let mut printer = PrintTree::new("Layout tree", dest);
-        self[self.root].print(self, self.root, &mut printer);
+        self[self.root].print(self, self.root, &mut printer, print_id);
     }
 
     /// Actually runs layout on the tree!

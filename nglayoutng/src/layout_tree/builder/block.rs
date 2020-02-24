@@ -6,6 +6,38 @@ use crate::style::*;
 
 pub struct BlockInside;
 
+/// For a given insertion point of non-anonymous nodes, find the actual
+/// insertion point that we should use, by adjusting the previous sibling in
+/// order to "escape" from any anonymous wrapper, or walk outside of our
+/// ib-split continuations.
+///
+/// TODO(emilio): Maybe find a better name for this?
+pub fn legalize_insertion_point(tree: &LayoutTree, ip: InsertionPoint) -> InsertionPoint {
+    let InsertionPoint {
+        parent,
+        prev_sibling,
+    } = ip;
+    let mut prev_sibling = match prev_sibling {
+        Some(s) => s,
+        None => return ip,
+    };
+    if tree[prev_sibling].is_inline() {
+        prev_sibling = tree.last_inline_continuation(prev_sibling);
+    }
+    loop {
+        let maybe_parent = tree[prev_sibling].parent.unwrap();
+        if maybe_parent == parent {
+            break;
+        }
+        assert_eq!(tree[maybe_parent].style.pseudo, Some(PseudoElement::InlineInsideBlockWrapper));
+        prev_sibling = maybe_parent;
+    }
+    InsertionPoint {
+        parent,
+        prev_sibling: Some(prev_sibling),
+    }
+}
+
 impl BlockInside {
     fn inline_wrapper(tree: &mut LayoutTree) -> LayoutNodeId {
         tree.alloc(LayoutNode::new_container(
@@ -82,7 +114,7 @@ impl BlockInside {
             }
         }
 
-        let ip = tree.legalize_insertion_point(ip);
+        let ip = legalize_insertion_point(tree, ip);
         let next_sibling = match ip.prev_sibling {
             Some(prev) => tree[prev].next_sibling?,
             None => tree[ip.parent]
@@ -130,7 +162,7 @@ impl BlockInside {
         // are an inline-formatting-context and we're inserting an inline, or we
         // have only non-inlines and we're inserting an inline.
         if !has_children || inline_formatting_context == node.style.display.is_inline_outside() {
-            return Some(tree.legalize_insertion_point(ip));
+            return Some(legalize_insertion_point(tree, ip));
         }
 
         if inline_formatting_context {
@@ -146,7 +178,7 @@ impl BlockInside {
 
         // We're an inline, and our previous or next sibling is a block, so
         // gotta wrap ourselves into an anonymous block.
-        let ip = tree.legalize_insertion_point(ip);
+        let ip = legalize_insertion_point(tree, ip);
         Some(Self::create_anon_block_for_single_inline(tree, ip))
     }
 }
