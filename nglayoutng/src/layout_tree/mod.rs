@@ -22,10 +22,67 @@ pub enum LeafKind {
     Replaced { intrinsic_size: Size2D<Au> },
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum ContainerKind {
-    Block,
-    Inline,
+    Block {
+        prev_ib_sibling: Option<LayoutNodeId>,
+        next_ib_sibling: Option<LayoutNodeId>,
+    },
+    Inline {
+        prev_ib_sibling: Option<LayoutNodeId>,
+        next_ib_sibling: Option<LayoutNodeId>,
+    },
+}
+
+impl std::fmt::Debug for ContainerKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            ContainerKind::Block { ref prev_ib_sibling, ref next_ib_sibling } => {
+                if prev_ib_sibling.is_none() && next_ib_sibling.is_none() {
+                    f.write_str("Block")
+                } else {
+                    f.debug_struct("Block")
+                        .field("prev_ib_sibling", prev_ib_sibling)
+                        .field("next_ib_sibling", next_ib_sibling)
+                        .finish()
+                }
+            }
+            ContainerKind::Inline { ref prev_ib_sibling, ref next_ib_sibling } => {
+                if prev_ib_sibling.is_none() && next_ib_sibling.is_none() {
+                    f.write_str("Inline")
+                } else {
+                    f.debug_struct("Inline")
+                        .field("prev_ib_sibling", prev_ib_sibling)
+                        .field("next_ib_sibling", next_ib_sibling)
+                        .finish()
+                }
+            }
+        }
+    }
+}
+
+impl ContainerKind {
+    pub fn inline() -> Self {
+        Self::Inline {
+            prev_ib_sibling: None,
+            next_ib_sibling: None,
+        }
+    }
+
+    pub fn block() -> Self {
+        Self::Block {
+            prev_ib_sibling: None,
+            next_ib_sibling: None,
+        }
+    }
+
+    pub fn is_block(&self) -> bool {
+        matches!(*self, Self::Block { .. })
+    }
+
+    pub fn is_inline(&self) -> bool {
+        matches!(*self, Self::Inline { .. })
+    }
 }
 
 #[derive(Debug)]
@@ -75,6 +132,30 @@ impl LayoutNode {
         }
     }
 
+    fn prev_ib_sibling(&self) -> Option<LayoutNodeId> {
+        match self.kind {
+            LayoutNodeKind::Container { ref kind, ..  } => {
+                match *kind {
+                    ContainerKind::Block { prev_ib_sibling, .. } |
+                    ContainerKind::Inline { prev_ib_sibling, .. } => prev_ib_sibling,
+                }
+            }
+            LayoutNodeKind::Leaf { .. } => None,
+        }
+    }
+
+    fn next_ib_sibling(&self) -> Option<LayoutNodeId> {
+        match self.kind {
+            LayoutNodeKind::Container { ref kind, ..  } => {
+                match *kind {
+                    ContainerKind::Block { next_ib_sibling, .. } |
+                    ContainerKind::Inline { next_ib_sibling, .. } => next_ib_sibling,
+                }
+            }
+            LayoutNodeKind::Leaf { .. } => None,
+        }
+    }
+
     fn is_anonymous(&self) -> bool {
         self.style.pseudo.map_or(false, |p| p.is_anonymous())
     }
@@ -84,13 +165,11 @@ impl LayoutNode {
     }
 
     pub fn is_block_container(&self) -> bool {
-        self.container_kind()
-            .map_or(false, |k| k == ContainerKind::Block)
+        self.container_kind().map_or(false, |k| k.is_block())
     }
 
     pub fn is_inline(&self) -> bool {
-        self.container_kind()
-            .map_or(false, |k| k == ContainerKind::Inline)
+        self.container_kind().map_or(false, |k| k.is_inline())
     }
 
     pub fn is_inline_continuation(&self, tree: &LayoutTree) -> bool {
@@ -99,7 +178,7 @@ impl LayoutNode {
 
     fn container_kind(&self) -> Option<ContainerKind> {
         match self.kind {
-            LayoutNodeKind::Container { kind, .. } => Some(kind),
+            LayoutNodeKind::Container { ref kind, .. } => Some(kind.clone()),
             LayoutNodeKind::Leaf { .. } => None,
         }
     }
@@ -431,12 +510,51 @@ pub struct LayoutTree {
 
 impl LayoutTree {
     pub fn new() -> Self {
-        let root = LayoutNode::new_container(ComputedStyle::for_viewport(), ContainerKind::Block);
+        let root = LayoutNode::new_container(ComputedStyle::for_viewport(), ContainerKind::block());
 
         let mut nodes = allocator::Allocator::default();
         let root = LayoutNodeId(nodes.allocate(root));
 
         Self { nodes, root }
+    }
+
+    fn non_anonymous_ancestor(&self, mut id: LayoutNodeId) -> Option<LayoutNodeId> {
+        loop {
+            id = self[id].parent?;
+            if !self[id].is_anonymous() {
+                return Some(id);
+            }
+        }
+    }
+
+    fn register_ib_split(&mut self, prev: LayoutNodeId, next: LayoutNodeId) {
+        assert!(self[prev].is_block_container() || self[prev].is_inline());
+        assert!(self[next].is_block_container() || self[next].is_inline());
+        assert!(self[prev].is_block_container() != self[next].is_block_container());
+
+        match self[prev].kind {
+            LayoutNodeKind::Container { ref mut kind, ..  } => {
+                match *kind {
+                    ContainerKind::Block { ref mut next_ib_sibling, ..  } |
+                    ContainerKind::Inline { ref mut next_ib_sibling, ..  } => {
+                        *next_ib_sibling = Some(next);
+                    }
+                }
+            }
+            _ => unreachable!(),
+        }
+
+        match self[next].kind {
+            LayoutNodeKind::Container { ref mut kind, ..  } => {
+                match *kind {
+                    ContainerKind::Block { ref mut prev_ib_sibling, ..  } |
+                    ContainerKind::Inline { ref mut prev_ib_sibling, ..  } => {
+                        *prev_ib_sibling = Some(prev);
+                    }
+                }
+            }
+            _ => unreachable!(),
+        }
     }
 
     pub fn assert_consistent(&self) {
@@ -455,9 +573,11 @@ impl LayoutTree {
         //     Inline
         //       some more...
         assert!(self[inline].is_inline());
-        // self[inline].parent()
-        // unimplemented!()
-        return inline;
+        let mut current = inline;
+        while let Some(next) = self[current].next_ib_sibling() {
+            current = next;
+        }
+        current
     }
 
     fn assert_subtree_consistent(&self, root: LayoutNodeId) {
@@ -505,7 +625,7 @@ impl LayoutTree {
 
         match self[root].container_kind() {
             None => {},
-            Some(ContainerKind::Block) => {
+            Some(ContainerKind::Block { .. }) => {
                 let mut saw_inline = false;
                 let mut saw_non_inline = false;
                 for child in self[root].children(self) {
@@ -520,7 +640,7 @@ impl LayoutTree {
                     saw_non_inline |= !inline;
                 }
             },
-            Some(ContainerKind::Inline) => {
+            Some(ContainerKind::Inline { .. }) => {
                 for child in self[root].children(self) {
                     assert!(
                         !child.style.display.is_block_outside(),
@@ -546,15 +666,17 @@ impl LayoutTree {
         LayoutNodeId(self.nodes.allocate(node))
     }
 
-    pub fn insert(&mut self, node: LayoutNode, ip: InsertionPoint) -> Option<LayoutNodeId> {
-        debug_assert!(
-            !self[ip.parent].is_anonymous() ||
-                self[ip.parent].style.pseudo == Some(PseudoElement::Viewport),
-        );
+    pub fn insert(&mut self, node: LayoutNode, mut ip: InsertionPoint) -> Option<LayoutNodeId> {
+        if let Some(ref mut prev_sibling) = ip.prev_sibling {
+            if self[*prev_sibling].is_inline() {
+                *prev_sibling = self.last_inline_continuation(*prev_sibling);
+            }
+        }
+
         let container_kind = self[ip.parent].container_kind()?;
         let ip = match container_kind {
-            ContainerKind::Inline => InlineInside::insertion(self, &node, ip)?,
-            ContainerKind::Block => BlockInside::insertion(self, &node, ip)?,
+            ContainerKind::Inline { .. } => InlineInside::insertion(self, &node, ip)?,
+            ContainerKind::Block { .. } => BlockInside::insertion(self, &node, ip)?,
         };
         let id = self.alloc(node);
         self.insert_unchecked(id, ip);
@@ -707,8 +829,8 @@ impl LayoutTree {
         }
 
         match self[parent].container_kind().unwrap() {
-            ContainerKind::Block => BlockInside::detach(self, parent, node_to_remove),
-            ContainerKind::Inline => InlineInside::detach(self, parent, node_to_remove),
+            ContainerKind::Block { .. } => BlockInside::detach(self, parent, node_to_remove),
+            ContainerKind::Inline { .. } => InlineInside::detach(self, parent, node_to_remove),
         }
     }
 

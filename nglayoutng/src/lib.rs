@@ -8,6 +8,8 @@ extern crate html5ever;
 extern crate kuchiki;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate matches;
 extern crate smallvec;
 #[macro_use]
 extern crate nglayoutng_derive;

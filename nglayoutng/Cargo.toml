@@ -14,6 +14,7 @@ html5ever = "0.23"
 cssparser = "0.25"
 log = "0.4.6"
 nglayoutng_derive = { path = "../derive" }
+matches = "0.1.0"
 
 [dev-dependencies]
 diff = "0.1"

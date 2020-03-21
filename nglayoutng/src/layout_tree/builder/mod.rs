@@ -271,9 +271,9 @@ impl LayoutTreeBuilder {
         }
 
         let container_kind = if style.display.is_inline_inside() {
-            ContainerKind::Inline
+            ContainerKind::inline()
         } else {
-            ContainerKind::Block
+            ContainerKind::block()
         };
         Some(LayoutNode::new_container(style.clone(), container_kind))
     }

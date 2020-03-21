@@ -21,9 +21,6 @@ pub fn legalize_insertion_point(tree: &LayoutTree, ip: InsertionPoint) -> Insert
         Some(s) => s,
         None => return ip,
     };
-    if tree[prev_sibling].is_inline() {
-        prev_sibling = tree.last_inline_continuation(prev_sibling);
-    }
     loop {
         let maybe_parent = tree[prev_sibling].parent.unwrap();
         if maybe_parent == parent {
@@ -42,7 +39,7 @@ impl BlockInside {
     fn inline_wrapper(tree: &mut LayoutTree) -> LayoutNodeId {
         tree.alloc(LayoutNode::new_container(
             ComputedStyle::for_inline_inside_block_wrapper(),
-            ContainerKind::Block,
+            ContainerKind::block(),
         ))
     }
 

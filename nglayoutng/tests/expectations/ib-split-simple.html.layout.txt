@@ -3,15 +3,15 @@
 │  │  ├─ Block
 │  │  │  ├─ Block
 │  │  │  │  ├─ Block (InlineInsideBlockWrapper)
-│  │  │  │  │  ├─ Inline
+│  │  │  │  │  ├─ Inline { prev_ib_sibling: None, next_ib_sibling: Some(LayoutNodeId(7)) }
 │  │  │  │  │  │  ├─ Text { text: "\n  My parent is an inline.\n  " }
-│  │  │  │  │  ├─ Text { text: "\nOutside split inline\n" }
-│  │  │  │  ├─ Block (BlockInsideInlineWrapper)
+│  │  │  │  ├─ Block { prev_ib_sibling: Some(LayoutNodeId(3)), next_ib_sibling: Some(LayoutNodeId(8)) } (BlockInsideInlineWrapper)
 │  │  │  │  │  ├─ Block
 │  │  │  │  │  │  ├─ Text { text: "\n    And mine is a block.\n  " }
 │  │  │  │  ├─ Block (InlineInsideBlockWrapper)
-│  │  │  │  │  ├─ Inline
+│  │  │  │  │  ├─ Inline { prev_ib_sibling: Some(LayoutNodeId(7)), next_ib_sibling: None }
 │  │  │  │  │  │  ├─ Text { text: "\n  More inline content here.\n  " }
 │  │  │  │  │  │  ├─ Inline
 │  │  │  │  │  │  │  ├─ Text { text: "Moar inline" }
 │  │  │  │  │  │  ├─ Text { text: "\n" }
+│  │  │  │  │  ├─ Text { text: "\nOutside split inline\n" }
