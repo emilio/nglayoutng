@@ -1,8 +1,8 @@
 ┌ Layout tree
-│  ├─ Block (bfc) (Viewport)
+│  ├─ Block (bfc) (fixed-cb) (Viewport)
 │  │  ├─ Block
 │  │  │  ├─ Block
-│  │  │  │  ├─ Block
+│  │  │  │  ├─ Block (ifc)
 │  │  │  │  │  ├─ Text { text: "\n  My parent is a block.\n  " }
 │  │  │  │  │  ├─ Inline
 │  │  │  │  │  │  ├─ Text { text: "\n    And mine is an inline.\n" }

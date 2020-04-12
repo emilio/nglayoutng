@@ -1,17 +1,17 @@
 ┌ Layout tree
-│  ├─ Block (bfc) (Viewport)
+│  ├─ Block (bfc) (fixed-cb) (Viewport)
 │  │  ├─ Block
 │  │  │  ├─ Block
-│  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  ├─ Block (ifc) (InlineInsideBlockWrapper)
 │  │  │  │  │  ├─ Inline { prev_ib_sibling: None, next_ib_sibling: Some(LayoutNodeId(20)) }
 │  │  │  │  │  │  ├─ Text { text: "\n  Outer inline.\n  " }
 │  │  │  │  │  │  ├─ Inline { prev_ib_sibling: None, next_ib_sibling: Some(LayoutNodeId(11)) }
 │  │  │  │  │  │  │  ├─ Text { text: "\n    My parent is an inline.\n    " }
 │  │  │  │  ├─ Block { prev_ib_sibling: Some(LayoutNodeId(3)), next_ib_sibling: Some(LayoutNodeId(10)) } (BlockInsideInlineWrapper)
 │  │  │  │  │  ├─ Block { prev_ib_sibling: Some(LayoutNodeId(5)), next_ib_sibling: Some(LayoutNodeId(12)) } (BlockInsideInlineWrapper)
-│  │  │  │  │  │  ├─ Block
+│  │  │  │  │  │  ├─ Block (ifc)
 │  │  │  │  │  │  │  ├─ Text { text: "\n      And mine is a block.\n    " }
-│  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  ├─ Block (ifc) (InlineInsideBlockWrapper)
 │  │  │  │  │  ├─ Inline { prev_ib_sibling: Some(LayoutNodeId(9)), next_ib_sibling: None }
 │  │  │  │  │  │  ├─ Inline { prev_ib_sibling: Some(LayoutNodeId(11)), next_ib_sibling: None }
 │  │  │  │  │  │  │  ├─ Text { text: "\n    More inline content here.\n    " }
@@ -20,9 +20,9 @@
 │  │  │  │  │  │  │  ├─ Text { text: "\n  " }
 │  │  │  │  │  │  ├─ Text { text: "\n  Moar inlines\n  " }
 │  │  │  │  ├─ Block { prev_ib_sibling: Some(LayoutNodeId(3)), next_ib_sibling: Some(LayoutNodeId(22)) } (BlockInsideInlineWrapper)
-│  │  │  │  │  ├─ Block
+│  │  │  │  │  ├─ Block (ifc)
 │  │  │  │  │  │  ├─ Text { text: "\n    And a random block here.\n  " }
-│  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  ├─ Block (ifc) (InlineInsideBlockWrapper)
 │  │  │  │  │  ├─ Inline { prev_ib_sibling: Some(LayoutNodeId(20)), next_ib_sibling: None }
 │  │  │  │  │  │  ├─ Text { text: "\n  " }
 │  │  │  │  │  │  ├─ Inline

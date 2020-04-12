@@ -6,7 +6,6 @@ use crate::layout_tree::{LayoutNode, LayoutNodeId};
 pub struct BlockFormattingContext<'a, 'b> {
     context: &'a LayoutContext<'b>,
     input_node: &'a LayoutNode,
-    out_of_flow_boxes: Vec<LayoutNodeId>,
 }
 
 impl<'a, 'b> BlockFormattingContext<'a, 'b> {
@@ -15,7 +14,6 @@ impl<'a, 'b> BlockFormattingContext<'a, 'b> {
         Self {
             context,
             input_node,
-            out_of_flow_boxes: vec![],
         }
     }
 
@@ -42,10 +40,11 @@ impl<'a, 'b> BlockFormattingContext<'a, 'b> {
 
         for (id, child) in self.input_node.children_and_id(self.context.layout_tree) {
             if child.style.is_out_of_flow_positioned() {
-                self.out_of_flow_boxes.push(id);
+                // FIXME: We need to do something with the static position.
                 continue;
             }
             if child.style.is_floating() {
+
             }
         }
 

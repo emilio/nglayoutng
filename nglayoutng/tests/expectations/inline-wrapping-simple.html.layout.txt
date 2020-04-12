@@ -1,13 +1,13 @@
 ┌ Layout tree
-│  ├─ Block (bfc) (Viewport)
+│  ├─ Block (bfc) (fixed-cb) (Viewport)
 │  │  ├─ Block
 │  │  │  ├─ Block
 │  │  │  │  ├─ Block
-│  │  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  │  ├─ Block (ifc) (InlineInsideBlockWrapper)
 │  │  │  │  │  │  ├─ Text { text: "\n  Text inside a block.\n  " }
-│  │  │  │  │  ├─ Block
+│  │  │  │  │  ├─ Block (ifc)
 │  │  │  │  │  │  ├─ Text { text: "\n    Which should get wrapped since there\'s another block.\n  " }
-│  │  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  │  ├─ Block (ifc) (InlineInsideBlockWrapper)
 │  │  │  │  │  │  ├─ Text { text: "\n  And more text.\n" }
-│  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  ├─ Block (ifc) (InlineInsideBlockWrapper)
 │  │  │  │  │  ├─ Text { text: "\n" }

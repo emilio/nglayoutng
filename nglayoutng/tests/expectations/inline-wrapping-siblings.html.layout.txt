@@ -1,26 +1,26 @@
 ┌ Layout tree
-│  ├─ Block (bfc) (Viewport)
+│  ├─ Block (bfc) (fixed-cb) (Viewport)
 │  │  ├─ Block
 │  │  │  ├─ Block
 │  │  │  │  ├─ Block
-│  │  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  │  ├─ Block (ifc) (InlineInsideBlockWrapper)
 │  │  │  │  │  │  ├─ Text { text: "\n  " }
 │  │  │  │  │  │  ├─ Inline
 │  │  │  │  │  │  │  ├─ Text { text: "An inline inside a block." }
 │  │  │  │  │  │  ├─ Text { text: "\n  With some text in between\n  " }
-│  │  │  │  │  ├─ Block
+│  │  │  │  │  ├─ Block (ifc)
 │  │  │  │  │  │  ├─ Text { text: "Then a block." }
-│  │  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  │  ├─ Block (ifc) (InlineInsideBlockWrapper)
 │  │  │  │  │  │  ├─ Text { text: "\n  " }
 │  │  │  │  │  │  ├─ Inline
 │  │  │  │  │  │  │  ├─ Text { text: "An inline..." }
 │  │  │  │  │  │  ├─ Text { text: "\n  And more text.\n  " }
-│  │  │  │  │  ├─ Block
+│  │  │  │  │  ├─ Block (ifc)
 │  │  │  │  │  │  ├─ Text { text: "\n    And another block.\n  " }
-│  │  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  │  ├─ Block (ifc) (InlineInsideBlockWrapper)
 │  │  │  │  │  │  ├─ Text { text: "\n  And more text.\n  " }
 │  │  │  │  │  │  ├─ Inline
 │  │  │  │  │  │  │  ├─ Text { text: "Then an inline again" }
 │  │  │  │  │  │  ├─ Text { text: "\n" }
-│  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  ├─ Block (ifc) (InlineInsideBlockWrapper)
 │  │  │  │  │  ├─ Text { text: "\n" }

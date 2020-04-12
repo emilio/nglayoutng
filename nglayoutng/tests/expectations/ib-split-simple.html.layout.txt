@@ -1,14 +1,14 @@
 ┌ Layout tree
-│  ├─ Block (bfc) (Viewport)
+│  ├─ Block (bfc) (fixed-cb) (Viewport)
 │  │  ├─ Block
 │  │  │  ├─ Block
-│  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  ├─ Block (ifc) (InlineInsideBlockWrapper)
 │  │  │  │  │  ├─ Inline { prev_ib_sibling: None, next_ib_sibling: Some(LayoutNodeId(7)) }
 │  │  │  │  │  │  ├─ Text { text: "\n  My parent is an inline.\n  " }
 │  │  │  │  ├─ Block { prev_ib_sibling: Some(LayoutNodeId(3)), next_ib_sibling: Some(LayoutNodeId(8)) } (BlockInsideInlineWrapper)
-│  │  │  │  │  ├─ Block
+│  │  │  │  │  ├─ Block (ifc)
 │  │  │  │  │  │  ├─ Text { text: "\n    And mine is a block.\n  " }
-│  │  │  │  ├─ Block (InlineInsideBlockWrapper)
+│  │  │  │  ├─ Block (ifc) (InlineInsideBlockWrapper)
 │  │  │  │  │  ├─ Inline { prev_ib_sibling: Some(LayoutNodeId(7)), next_ib_sibling: None }
 │  │  │  │  │  │  ├─ Text { text: "\n  More inline content here.\n  " }
 │  │  │  │  │  │  ├─ Inline

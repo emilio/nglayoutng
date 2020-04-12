@@ -320,7 +320,7 @@ impl LayoutNode {
         }
     }
 
-    fn print_label(&self, id: LayoutNodeId, print_id: PrintId) -> String {
+    fn print_label(&self, id: LayoutNodeId, print_id: PrintId, tree: &LayoutTree) -> String {
         let mut label = match self.kind {
             LayoutNodeKind::Container { ref kind, .. } => format!("{:?}", kind),
             LayoutNodeKind::Leaf { ref kind } => format!("{:?}", kind),
@@ -338,6 +338,17 @@ impl LayoutNode {
             label.push_str(" (bfc)");
         }
 
+        if self.establishes_ifc(tree) {
+            label.push_str(" (ifc)");
+        }
+
+        if self.is_fixed_containing_block() {
+            debug_assert!(self.is_absolute_containing_block());
+            label.push_str(" (fixed-cb)");
+        } else if self.is_absolute_containing_block() {
+            label.push_str(" (abspos-cb)");
+        }
+
         if let Some(pseudo) = self.style.pseudo {
             label.push_str(&format!(" ({:?})", pseudo));
         }
@@ -346,7 +357,7 @@ impl LayoutNode {
     }
 
     fn print(&self, tree: &LayoutTree, id: LayoutNodeId, printer: &mut PrintTree, print_id: PrintId) {
-        printer.new_level(self.print_label(id, print_id));
+        printer.new_level(self.print_label(id, print_id, tree));
         for (id, child) in self.children_and_id(tree) {
             child.print(tree, id, printer, print_id);
         }
