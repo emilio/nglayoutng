@@ -139,9 +139,6 @@ impl InlineInside {
 
         tree.register_ib_split(ip.parent, block_wrapper);
 
-        println!("Created block wrapper for {:?}", ip.parent);
-        tree.print_with_ids();
-
         let continuation = {
             let continuation = Self::inline_continuation(tree, ip.parent);
             let insertion_point = InsertionPoint {
@@ -152,9 +149,6 @@ impl InlineInside {
         };
 
         tree.register_ib_split(block_wrapper, continuation);
-
-        println!("Created block wrapper and continuation for {:?}", ip.parent);
-        tree.print_with_ids();
 
         tree.move_children_to(continuation_to_split, continuation, ip.prev_sibling);
 
