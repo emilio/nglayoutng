@@ -1,7 +1,7 @@
 use crate::logical_geometry::{self, LogicalMargin, LogicalSize};
 use app_units::Au;
 use cssparser::{Color, RGBA};
-use euclid::{SideOffsets2D, Size2D};
+use euclid::default::{SideOffsets2D, Size2D};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum DisplayInside {
@@ -209,7 +209,7 @@ pub struct Percentage(pub f32);
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Length(pub Au);
 
-#[derive(Default, Debug, Copy, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct LengthPercentage {
     pub fixed: Length,
     pub percentage: Option<Percentage>,
@@ -235,7 +235,7 @@ impl LengthPercentage {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LengthPercentageOrAuto {
     LengthPercentage(LengthPercentage),
     Auto,
@@ -262,7 +262,7 @@ impl Default for SizeKeyword {
 }
 
 /// https://drafts.csswg.org/css-sizing/#sizing-properties
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Size {
     LengthPercentage(LengthPercentage),
     Keyword(SizeKeyword),
@@ -523,66 +523,66 @@ impl ComputedStyle {
         .finish(false)
     }
 
-    fn physical_padding(&self) -> SideOffsets2D<LengthPercentage> {
+    fn physical_padding(&self) -> SideOffsets2D<&LengthPercentage> {
         SideOffsets2D::new(
-            self.padding_top,
-            self.padding_right,
-            self.padding_bottom,
-            self.padding_left,
+            &self.padding_top,
+            &self.padding_right,
+            &self.padding_bottom,
+            &self.padding_left,
         )
     }
 
-    fn physical_margin(&self) -> SideOffsets2D<LengthPercentageOrAuto> {
+    fn physical_margin(&self) -> SideOffsets2D<&LengthPercentageOrAuto> {
         SideOffsets2D::new(
-            self.margin_top,
-            self.margin_right,
-            self.margin_bottom,
-            self.margin_left,
+            &self.margin_top,
+            &self.margin_right,
+            &self.margin_bottom,
+            &self.margin_left,
         )
     }
 
-    fn physical_border_widths(&self) -> SideOffsets2D<Length> {
+    fn physical_border_widths(&self) -> SideOffsets2D<Au> {
         SideOffsets2D::new(
-            self.border_top_width,
-            self.border_right_width,
-            self.border_bottom_width,
-            self.border_left_width,
+            self.border_top_width.0,
+            self.border_right_width.0,
+            self.border_bottom_width.0,
+            self.border_left_width.0,
         )
     }
 
-    fn physical_size(&self) -> Size2D<Size> {
-        Size2D::new(self.width, self.height)
+    fn physical_size(&self) -> Size2D<&Size> {
+        Size2D::new(&self.width, &self.height)
     }
 
-    pub fn size(&self) -> LogicalSize<Size> {
+    pub fn size(&self) -> LogicalSize<&Size> {
         LogicalSize::from_physical(self.writing_mode, self.physical_size())
     }
 
-    fn physical_max_size(&self) -> Size2D<Size> {
-        Size2D::new(self.max_width, self.max_height)
+    fn physical_max_size(&self) -> Size2D<&Size> {
+        Size2D::new(&self.max_width, &self.max_height)
     }
 
-    pub fn max_size(&self) -> LogicalSize<Size> {
+    pub fn max_size(&self) -> LogicalSize<&Size> {
         LogicalSize::from_physical(self.writing_mode, self.physical_max_size())
     }
 
-    fn physical_min_size(&self) -> Size2D<Size> {
-        Size2D::new(self.min_width, self.min_height)
+    fn physical_min_size(&self) -> Size2D<&Size> {
+        Size2D::new(&self.min_width, &self.min_height)
     }
 
-    pub fn min_size(&self) -> LogicalSize<Size> {
+    pub fn min_size(&self) -> LogicalSize<&Size> {
         LogicalSize::from_physical(self.writing_mode, self.physical_min_size())
     }
 
-    pub fn margin(&self) -> LogicalMargin<LengthPercentageOrAuto> {
+    pub fn margin(&self) -> LogicalMargin<&LengthPercentageOrAuto> {
         LogicalMargin::from_physical(self.writing_mode, self.physical_margin())
     }
 
-    pub fn padding(&self) -> LogicalMargin<LengthPercentage> {
+    pub fn padding(&self) -> LogicalMargin<&LengthPercentage> {
         LogicalMargin::from_physical(self.writing_mode, self.physical_padding())
     }
 
-    pub fn border_widths(&self) -> LogicalMargin<Length> {
+    pub fn border_widths(&self) -> LogicalMargin<Au> {
         LogicalMargin::from_physical(self.writing_mode, self.physical_border_widths())
     }
 }

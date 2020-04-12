@@ -16,6 +16,7 @@ pub struct LayoutContext<'a> {
     pub layout_tree: &'a LayoutTree,
 }
 
+#[derive(Clone, Debug)]
 pub struct AvailableSize(LogicalSize<Option<Au>>);
 
 impl std::ops::Deref for AvailableSize {
@@ -31,12 +32,29 @@ impl AvailableSize {
         AvailableSize(LogicalSize::new(wm, Some(size.inline), Some(size.block)))
     }
 
+    pub fn unconstrained_block(wm: WritingMode, inline: Au) -> Self {
+        AvailableSize(LogicalSize::new(wm, Some(inline), None))
+    }
+
     pub fn inline(&self) -> Au {
         self.inline.expect("Should never have unconstrained available inline size")
     }
 
-    pub fn unconstrained_block(wm: WritingMode, inline: Au) -> Self {
-        AvailableSize(LogicalSize::new(wm, Some(inline), None))
+    pub fn shrink_block_size(&mut self, by: Au) {
+        if let Some(ref mut block) = self.0.block {
+            *block -= by;
+            if *block < Au(0) {
+                *block = Au(0);
+            }
+        }
+    }
+
+    pub fn shrink_inline_size(&mut self, by: Au) {
+        let inline = self.0.inline.as_mut().unwrap();
+        *inline -= by;
+        if *inline < Au(0) {
+            *inline = Au(0);
+        }
     }
 }
 
@@ -48,44 +66,12 @@ pub struct ConstraintSpace {
     // TODO(emilio): Sure we need to add more stuff here.
 }
 
-#[derive(BreakToken)]
-pub enum GenericBreakToken {
-    Block(block::BreakToken),
-}
-
-/// A generic layout result from any layout algorithm.
-pub struct GenericLayoutResult {
-    pub root_fragment: ChildFragment,
-    pub break_token: Option<GenericBreakToken>,
-}
-
 /// A layout result for a given layout algorithm.
-pub struct LayoutResult<BreakToken> {
+pub struct LayoutResult {
     /// The main fragment this layout pass has generated.
     pub root_fragment: ChildFragment,
-    /// The break token allows to resume layout for the given layout algorithm
-    /// and fragment.
-    pub break_token: Option<BreakToken>,
-}
-
-impl<BreakToken> LayoutResult<BreakToken>
-where
-    BreakToken: Into<GenericBreakToken>,
-{
-    pub fn into_generic(self) -> GenericLayoutResult {
-        GenericLayoutResult {
-            root_fragment: self.root_fragment,
-            break_token: self.break_token.map(Into::into),
-        }
-    }
 }
 
 pub trait LayoutAlgorithm {
-    type BreakToken;
-
-    fn layout(
-        &self,
-        constraints: &ConstraintSpace,
-        break_token: Option<Self::BreakToken>,
-    ) -> LayoutResult<Self::BreakToken>;
+    fn layout(&mut self, constraints: &ConstraintSpace) -> LayoutResult;
 }

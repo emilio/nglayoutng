@@ -3,7 +3,7 @@ use crate::css;
 use crate::dom;
 use crate::style::ComputedStyle;
 use app_units::Au;
-use euclid::Size2D;
+use euclid::default::Size2D;
 
 use kuchiki::{self, NodeData, NodeRef};
 

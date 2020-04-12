@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 app_units = "0.7"
-euclid = "0.19"
+euclid = "0.20"
 bitflags = "1.0"
 smallvec = "0.6"
 kuchiki = "0.7"

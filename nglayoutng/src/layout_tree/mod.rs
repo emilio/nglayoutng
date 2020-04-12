@@ -10,7 +10,7 @@ use crate::logical_geometry::{LogicalSize, WritingMode};
 use crate::misc::print_tree::PrintTree;
 use crate::style::{self, ComputedStyle, Display, DisplayInside, PseudoElement};
 use app_units::Au;
-use euclid::Size2D;
+use euclid::default::Size2D;
 use html5ever::tree_builder::QuirksMode;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -407,7 +407,7 @@ impl LayoutNode {
         Some(&tree[self.prev_sibling?])
     }
 
-    fn children_and_id<'tree>(
+    pub fn children_and_id<'tree>(
         &self,
         tree: &'tree LayoutTree,
     ) -> impl Iterator<Item = (LayoutNodeId, &'tree LayoutNode)> {
@@ -418,7 +418,7 @@ impl LayoutNode {
         }
     }
 
-    fn rev_children_and_id<'tree>(
+    pub fn rev_children_and_id<'tree>(
         &self,
         tree: &'tree LayoutTree,
     ) -> impl Iterator<Item = (LayoutNodeId, &'tree LayoutNode)> {
@@ -942,8 +942,8 @@ impl LayoutTree {
             containing_block_writing_mode: wm,
         };
 
-        let result = BlockFormattingContext::new(&context, root).layout(&constraints, None);
-        assert!(result.break_token.is_none(), "How did we fragment with unconstrained block size?");
+        let result = BlockFormattingContext::new(&context, root).layout(&constraints);
+        // assert!(result.break_token.is_none(), "How did we fragment with unconstrained block size?");
         result.root_fragment
     }
 }
