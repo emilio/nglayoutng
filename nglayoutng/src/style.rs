@@ -125,6 +125,16 @@ pub enum BoxSizing {
     BorderBox,
 }
 
+impl BoxSizing {
+    pub fn border_box(self) -> bool {
+        self == BoxSizing::BorderBox
+    }
+
+    pub fn content_box(self) -> bool {
+        self == BoxSizing::ContentBox
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
 pub enum Position {
     Static,

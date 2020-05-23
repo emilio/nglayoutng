@@ -591,12 +591,12 @@ impl<T: Zero> LogicalPoint<T> {
     }
 }
 
-impl<T: Copy> LogicalPoint<T> {
+impl<T> LogicalPoint<T> {
     #[inline]
     pub fn new(mode: WritingMode, i: T, b: T) -> LogicalPoint<T> {
         LogicalPoint {
-            i: i,
-            b: b,
+            i,
+            b,
             debug_writing_mode: DebugWritingMode::new(mode),
         }
     }

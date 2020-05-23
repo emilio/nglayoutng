@@ -1,3 +1,4 @@
+use crate::logical_geometry::*;
 use crate::style::ComputedStyle;
 use app_units::Au;
 use euclid::default::{Point2D, Size2D};
@@ -6,7 +7,7 @@ use euclid::default::{Point2D, Size2D};
 /// parent fragment.
 pub struct ChildFragment {
     /// The offset relative to the parent fragment's origin.
-    pub offset: Point2D<Au>,
+    pub offset: LogicalPoint<Au>,
     /// The child fragment itself.
     ///
     /// TODO(emilio): We might want to refcount fragments or something.
@@ -43,7 +44,7 @@ pub enum FragmentKind {
 /// It contains only the sizing information, children are stored in .
 pub struct Fragment {
     /// The physical size of this fragment.
-    pub size: Size2D<Au>,
+    pub size: LogicalSize<Au>,
     /// The style of this fragment.
     pub style: ComputedStyle,
     /// Which kind of fragment this is.
