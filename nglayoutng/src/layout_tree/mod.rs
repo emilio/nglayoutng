@@ -4,8 +4,9 @@ use self::builder::InsertionPoint;
 use crate::allocator;
 use crate::fragment_tree::ChildFragment;
 use crate::layout_tree::builder::{inline::InlineInside, block::BlockInside};
-use crate::layout_algorithms::{AvailableSize, ConstraintSpace, LayoutAlgorithm, LayoutContext};
+use crate::layout_algorithms::{AvailableSize, ConstraintSpace, LayoutAlgorithm, LayoutResult, LayoutContext};
 use crate::layout_algorithms::block::BlockFormattingContext;
+use crate::layout_algorithms::inline::InlineFormattingContext;
 use crate::logical_geometry::{LogicalSize, WritingMode};
 use crate::misc::print_tree::PrintTree;
 use crate::style::{self, ComputedStyle, Display, DisplayInside, PseudoElement};
@@ -253,6 +254,37 @@ impl LayoutNode {
             Some(c) => c.style.display.is_inline_outside(),
             None => false,
         }
+    }
+
+    pub fn establishes_formatting_context(&self, tree: &LayoutTree) -> bool {
+        self.establishes_bfc() || self.establishes_ifc(tree)
+    }
+
+    /// Whether this is a replaced box.
+    pub fn is_replaced(&self) -> bool {
+        matches!(self.kind, LayoutNodeKind::Leaf { kind: LeafKind::Replaced { .. } })
+    }
+
+    /// Whether this box has an independent layout, that is, whether it's a
+    /// formatting context or an atomic box.
+    pub fn has_independent_layout(&self, context: &LayoutContext) -> bool {
+        self.establishes_formatting_context(context.layout_tree) || self.is_replaced()
+    }
+
+    pub fn layout(&self, context: &LayoutContext, constraints: &ConstraintSpace) -> LayoutResult {
+        debug_assert!(self.has_independent_layout(context));
+        if self.establishes_ifc(context.layout_tree) {
+            return InlineFormattingContext::new(context, self).layout(constraints);
+        }
+
+        if self.establishes_bfc() {
+            return BlockFormattingContext::new(context, self).layout(constraints);
+        }
+        if self.is_replaced() {
+            // TODO(replaced)
+        }
+        // TODO(ifc)
+        unimplemented!()
     }
 
     fn ancestors<'tree>(&self, tree: &'tree LayoutTree) -> AncestorIterator<'tree> {
@@ -953,7 +985,8 @@ impl LayoutTree {
             containing_block_writing_mode: wm,
         };
 
-        let result = BlockFormattingContext::new(&context, root).layout(&constraints);
+        let result = root.layout(&context, &constraints);
+
         // assert!(result.break_token.is_none(), "How did we fragment with unconstrained block size?");
         result.root_fragment
     }
