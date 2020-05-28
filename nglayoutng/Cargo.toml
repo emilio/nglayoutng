@@ -15,6 +15,7 @@ cssparser = "0.25"
 log = "0.4.6"
 nglayoutng_derive = { path = "../derive" }
 matches = "0.1.0"
+unicode-bidi = "0.3"
 
 [dev-dependencies]
 diff = "0.1"

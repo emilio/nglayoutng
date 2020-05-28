@@ -120,6 +120,37 @@ impl Display {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
+pub enum WhiteSpace {
+    Normal,
+    Pre,
+    Nowrap,
+    PreWrap,
+    BreakSpaces,
+    PreLine,
+}
+
+impl WhiteSpace {
+    // https://drafts.csswg.org/css-text-3/#white-space-phase-1
+    pub fn collapses_spaces(self) -> bool {
+        match self {
+            Self::Normal | Self::Nowrap | Self::PreLine => true,
+            _ => false,
+        }
+    }
+
+    // https://drafts.csswg.org/css-text-3/#line-break-transform
+    pub fn collapses_newlines(self) -> bool {
+        match self {
+            Self::Pre | Self::PreWrap | Self::PreLine | Self::BreakSpaces => false,
+            _ => {
+                debug_assert!(self.collapses_spaces());
+                true
+            }
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
 pub enum BoxSizing {
     ContentBox,
     BorderBox,
@@ -374,6 +405,8 @@ pub struct MutableComputedStyle {
     pub right: LengthPercentage,
     pub bottom: LengthPercentage,
     pub left: LengthPercentage,
+
+    pub white_space: WhiteSpace,
 }
 
 impl MutableComputedStyle {
@@ -496,6 +529,8 @@ impl ComputedStyle {
             right: Default::default(),
             bottom: Default::default(),
             left: Default::default(),
+
+            white_space: WhiteSpace::Normal,
         }
     }
 
@@ -506,6 +541,7 @@ impl ComputedStyle {
             text_orientation: self.text_orientation,
             computed_writing_mode: self.computed_writing_mode,
             color: self.color,
+            white_space: self.white_space,
             ..Self::initial()
         }
     }
