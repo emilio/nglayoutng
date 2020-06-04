@@ -1,5 +1,5 @@
 Margin collapsing in LayoutNG, etc... - chat with ikilpatrick at TPAC 2018 - 25. Oct
-====================================================================
+====================================================================================
 
  * Single pass.
 
@@ -29,3 +29,71 @@ Layout in parallel?
 
  * https://bugs.webkit.org/show_bug.cgi?id=208112 has interesting float
    test-cases.
+
+Inline Layout edge cases
+========================
+
+Capturing some conversations with Jonathan over Matrix.
+
+ * It seems like the InlineItem data-structure currently in the repo ought to
+   work, at a glance.
+
+ * BiDi:
+
+    - We need to split text items based on bidi level. How to bidi is going to
+      be fun but hopefully the model is going to be nicer than our current fluid
+      continuation stuff.
+
+    - BiDi can not only reorder, but also split inlines, somehow, according to
+      <https://drafts.csswg.org/css-writing-modes-3/#bidi-control-codes>:
+
+> Note that bidi control codes in the source text are still honored, and
+> might not correspond to the document tree structure. This can split
+> inlines or interfere with bidi start/end control pairing in interesting
+> ways.
+
+      Have to deal with that in some way. Maybe making text items keep a
+      reference to their layout node id as well so that we can look up the right
+      font. That may be enough.
+
+      I gotta figure out whether we support that properly or not. It seems Blink
+      doesn't:
+
+https://source.chromium.org/chromium/chromium/src/+/master:third_party/blink/renderer/core/layout/ng/inline/ng_inline_layout_algorithm.cc;l=1175-1178;drc=17ef0754c67ad29fb0e1286c525ead9b9973995b
+
+      That may make this simpler, we'll see.
+
+ * Deciding how to store and cache shaped text is important. Some edge-cases
+   that are of special interest there:
+
+   - Re-shaping can in theory be needed after line-breaking. Gecko doesn't deal
+     with this at the moment, but that causes bad text rendering when we break
+     in the middle of a ligature, or on a kerned space.
+     https://bugzilla.mozilla.org/show_bug.cgi?id=479829 is a bug on file for
+     this. Relevant code that right now is a no-op is gfxTextRun::SetLineBreaks.
+
+   - A harder edge case that may be a bit less important but ideally worth
+     fixing: When we auto-hyphenate, we just paint a separate hyphen glyph-run
+     at the end of the line. But if the font wants to kern the hyphen with the
+     preceding letter, we don't handle that. Same applies to text-overflow
+     ellipsis, too. Handling this is even harder because we currently assume
+     things like the hyphen and ellipsis making a fixed contribution to the
+     width, which is no longer true if we allow them to shape with the adjacent
+     text.
+
+   - Jonathan considers important to have a path forward at least for the
+     "shape-after-line-breaking" cases.
+
+   - Gecko caches per-word shaping information, only if the font has no shaping
+     rules for the space glyph. This means that in practice most CJK text
+     doesn't get cached, for example.
+
+   - For the general case you need to shape the full paragraph / same-font run.
+     Jonathan seems to think that this may not be a bottleneck in practice.
+
+   - Potentially relevant, on the topic of caching and shaping dependent across
+     line-breaks:
+
+     * https://github.com/linebender/skribo/issues/4
+     * https://github.com/harfbuzz/harfbuzz/issues/1463#issuecomment-448081494
+     * https://github.com/harfbuzz/harfbuzz/issues/1463#issuecomment-505592189
