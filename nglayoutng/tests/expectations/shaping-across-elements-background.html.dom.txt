@@ -1,0 +1,15 @@
+┌ DOM tree
+│  ├─ #document
+│  │  ├─ <!DOCTYPE html  >
+│  │  ├─ <html>
+│  │  │  ├─ <head>
+│  │  │  │  ├─ <style>
+│  │  │  │  │  ├─ #text "\n  div {\n    font-size: 180px;\n    font-family: \"Nimbus Roman\", Times;\n  }\n  span { background: rgba(255, 0, 0, .5); }\n  span + span { background: rgba(0, 255, 0, .5); }\n"
+│  │  │  │  ├─ #text "\n"
+│  │  │  ├─ <body>
+│  │  │  │  ├─ <div>
+│  │  │  │  │  ├─ <span>
+│  │  │  │  │  │  ├─ #text "f"
+│  │  │  │  │  ├─ <span>
+│  │  │  │  │  │  ├─ #text "i"
+│  │  │  │  ├─ #text "\n"

@@ -1,0 +1,11 @@
+┌ Layout tree
+│  ├─ Block (bfc) (fixed-cb) (Viewport)
+│  │  ├─ Block
+│  │  │  ├─ Block
+│  │  │  │  ├─ Block (ifc)
+│  │  │  │  │  ├─ Inline
+│  │  │  │  │  │  ├─ Text { text: "f" }
+│  │  │  │  │  ├─ Inline
+│  │  │  │  │  │  ├─ Text { text: "i" }
+│  │  │  │  ├─ Block (ifc) (InlineInsideBlockWrapper)
+│  │  │  │  │  ├─ Text { text: "\n" }
