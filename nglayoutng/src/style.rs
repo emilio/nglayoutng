@@ -250,10 +250,22 @@ pub struct Percentage(pub f32);
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Length(pub Au);
 
+impl Length {
+    pub fn is_zero(&self) -> bool {
+        (self.0).0 == 0
+    }
+}
+
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct LengthPercentage {
     pub fixed: Length,
     pub percentage: Option<Percentage>,
+}
+
+impl LengthPercentage {
+    pub fn is_zero(&self) -> bool {
+        self.fixed.is_zero() && self.percentage.is_none()
+    }
 }
 
 impl LengthPercentage {
@@ -280,6 +292,15 @@ impl LengthPercentage {
 pub enum LengthPercentageOrAuto {
     LengthPercentage(LengthPercentage),
     Auto,
+}
+
+impl LengthPercentageOrAuto {
+    pub fn is_zero(&self) -> bool {
+        match *self {
+            LengthPercentageOrAuto::LengthPercentage(ref lp) => lp.is_zero(),
+            LengthPercentageOrAuto::Auto => false,
+        }
+    }
 }
 
 impl Default for LengthPercentageOrAuto {

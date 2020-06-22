@@ -9,6 +9,7 @@ app_units = "0.7"
 euclid = "0.20"
 bitflags = "1.0"
 smallvec = "0.6"
+smallbitvec = "2.5"
 kuchiki = "0.7"
 html5ever = "0.23"
 cssparser = "0.25"
@@ -16,6 +17,7 @@ log = "0.4.6"
 nglayoutng_derive = { path = "../derive" }
 matches = "0.1.0"
 unicode-bidi = "0.3"
+xi-unicode = "0.1"
 
 [dev-dependencies]
 diff = "0.1"

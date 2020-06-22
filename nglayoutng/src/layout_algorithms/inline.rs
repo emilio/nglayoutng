@@ -1,8 +1,118 @@
 use app_units::Au;
 use crate::fragment_tree::{ChildFragment, Fragment, FragmentKind, ContainerFragmentKind};
+use crate::logical_geometry::*;
+use crate::style::ComputedStyle;
 use super::{ConstraintSpace, LayoutContext, LayoutResult};
 use crate::layout_tree::{LayoutNodeKind, LeafKind, ContainerKind, LayoutNode, LayoutNodeId};
 use smallvec::SmallVec;
+use smallbitvec::SmallBitVec;
+
+/// A position for a given line break.
+#[derive(Clone)]
+struct InlineItemPosition {
+    /// The index of the item, may be one past the end to represent "the whole
+    /// range".
+    item_index: usize,
+    /// The byte index of the line break inside the given text string.
+    text_start: usize,
+}
+
+impl InlineItemPosition {
+    fn start() -> Self {
+        Self {
+            item_index: 0,
+            text_start: 0,
+        }
+    }
+}
+
+/*
+struct LineBreaker<'a, 'b, 'c> {
+    fc: &'a mut InlineFormattingContext<'b, 'c>,
+    constraints: &'a ConstraintSpace,
+    lines: Vec<ChildFragment>,
+    current_line: Vec<ChildFragment>,
+    current_line_available_size: Au,
+    current_line_max_block_size: Au,
+    current_item_position: InlineItemPosition,
+    /// The last item we laid out, which didn't fit.
+    last_laid_out_item: Option<ChildFragment>,
+}
+
+impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
+    fn new(fc: &'a mut InlineFormattingContext<'b, 'c>, constraints: &'a ConstraintSpace) -> Self {
+        Self {
+            fc,
+            constraints,
+            lines: vec![],
+            current_line: vec![],
+            current_line_available_size: constraints.available_size.inline(),
+            current_line_max_block_size: Au(0),
+            current_item_position: InlineItemPosition::start(),
+            last_laid_out_item: None,
+        }
+    }
+
+    fn flush_line(&mut self) {
+        if self.current_line.is_empty() {
+            return;
+        }
+
+        let line_fragments = std::mem::replace(&mut self.current_line, vec![]);
+        let max_block_size = std::mem::replace(&mut self.current_line_max_block_size, Au(0));
+
+        // TODO: first-line style if appropriate?
+        let style = self.fc.input_node.style.clone();
+        let wm = style.writing_mode;
+
+        // TODO: Compute line box size from contents.
+        //
+        // TODO: Account for line-height?
+        //
+        // TODO: Line box size may be affected by floats, may not always be the
+        // avail inline size.
+        let size = LogicalSize::new(wm, self.constraints.available_size.inline(), self.current_line_max_block_size);
+
+        // TODO: Vertical alignment of items. Here or when we're done with all
+        // liens?
+
+        let line = ChildFragment {
+            offset: LogicalPoint::zero(wm),
+            fragment: Box::new(Fragment {
+                size,
+                style,
+                kind: FragmentKind::Container {
+                    kind: ContainerFragmentKind::Line {},
+                    children: line_fragments.into_boxed_slice(),
+                }
+            }),
+        };
+
+        // Go to the next line.
+        self.current_line_available_size = self.constraints.available_size.inline();
+    }
+
+    fn break_next(&mut self) -> bool {
+        loop {
+            // Take our next item to fit.
+            let next_fragment = match self.last_laid_out_item.take().or_else(|| self.next_item_fragment()) {
+                Some(fragment) => fragment,
+                None => {
+                    // No more fragments, we're all done.
+                    self.flush_line();
+                    return false;
+                },
+            };
+
+            // If we're in an empty line, everything fits.
+            if self.current_line.is_empty() {
+            }
+        }
+
+        true
+    }
+}
+*/
 
 pub struct InlineFormattingContext<'a, 'b> {
     context: &'a LayoutContext<'b>,
@@ -10,6 +120,8 @@ pub struct InlineFormattingContext<'a, 'b> {
     items: Vec<InlineItem>,
 }
 
+/// An item we do inline layout on. Each of these correspond roughly to the
+/// (rendered) DOM.
 enum InlineItem {
     // The start of a nested inline box.
     TagStart(LayoutNodeId),
@@ -19,6 +131,29 @@ enum InlineItem {
     Replaced(LayoutNodeId),
     AtomicInline(LayoutNodeId),
     TagEnd(LayoutNodeId),
+}
+
+/// An item in the shaped paragraph.
+#[derive(Debug)]
+enum ParagraphComponent {
+    /// A text run. Note that this may span multiple Text(..) text items. It's
+    /// not clear how to best model this. An inline box may end up ending in the
+    /// middle of one of these.
+    TextRun {
+        style: ComputedStyle,
+        text: Box<str>,
+        break_opportunities: SmallBitVec,
+    },
+    HardBreak,
+    // https://drafts.csswg.org/css-text-3/#line-break-details:
+    //
+    //     For Web-compatibility there is a soft wrap opportunity before
+    //     and after each replaced element or other atomic inline, even
+    //     when adjacent to a character that would normally suppress
+    //     them, such as U+00A0 NO-BREAK SPACE.
+    //
+    // Which is fairly convenient, as that means we can just flush text runs and
+    // not care about those here.
 }
 
 // https://drafts.csswg.org/css-text-3/#space-discard-set
@@ -56,6 +191,36 @@ fn is_space_discarding(c: char) -> bool {
         '\u{30000}'..='\u{3134F}' => true,
         _ => false
     }
+}
+
+// https://searchfox.org/mozilla-central/rev/3d39d3b7dd1b2be30692d4541ea681614e34c786/layout/generic/nsTextFrame.cpp#1826-1827
+// https://drafts.csswg.org/css-text/#boundary-shaping
+fn can_continue_run(run_style: &ComputedStyle, new_style: &ComputedStyle, at_beginning: bool) -> bool {
+    if run_style.writing_mode != new_style.writing_mode {
+        return false;
+    }
+
+    // Any of margin/border/padding separating the two typographic character
+    // units in the inline axis is non-zero.
+    let margin = new_style.margin();
+    let padding = new_style.padding();
+    let border = new_style.border_widths();
+    let (margin, padding, border) = if at_beginning {
+        (margin.inline_start, padding.inline_start, border.inline_start)
+    } else {
+        (margin.inline_end, padding.inline_end, border.inline_end)
+    };
+
+    if !margin.is_zero() || !padding.is_zero() || border.0 != 0 {
+        return false;
+    }
+
+    // TODO: vertical-align is not baseline
+    // TODO: The boundary is a bidi isolation boundary.
+    //
+    // TODO: line-break / word-break / maybe white-space: nowrap-ness?
+
+    true
 }
 
 impl<'a, 'b> InlineFormattingContext<'a, 'b> {
@@ -237,11 +402,150 @@ impl<'a, 'b> InlineFormattingContext<'a, 'b> {
         }
     }
 
+    // A text run may be made of various text items, or various inline items
+    // etc. We try to shape in "paragraph" boundaries (as in, around hard
+    // breaks, or the whole thing if there are none).
+    //
+    // Line-breaking may make us re-shape some of that text, as needed, as a
+    // result of breaking. For example, consider the following:
+    //
+    // <style>
+    // p { font-size: 10px; }
+    // ::first-line { font-size: 30px }
+    // </style>
+    // <p>This is a not-very-long paragraph</p>
+    //                           ^
+    //                           |
+    //                           +--- Break here.
+    //
+    // We need to shape with the first-line style, until we hit a break.
+    // Once we know where to break, then we need to shape the rest of the
+    // run with the non-first-line style. This kinda sucks in multiple ways.
+    //
+    // If we know we're not dealing with ::first-line, we may still need to
+    // re-shape, if we happen to break inside a ligature, or a kerned space,
+    // see https://bugzilla.mozilla.org/show_bug.cgi?id=479829. Though that is
+    // less common. Still, in the common case, the breakpoint happens to be in a
+    // e.g. space, or other place where we can slice the shaping result, and
+    // carry on.
+    fn line_break_and_split_for_shaping(&mut self) -> Vec<ParagraphComponent> {
+        let mut breaker = xi_unicode::LineBreakLeafIter::new("", 0);
+
+        let mut style_stack = SmallVec::<[&_; 5]>::new();
+        style_stack.push(&self.input_node.style);
+
+        let mut current_run = String::new();
+        let mut current_run_offset = 0;
+        let mut current_run_style = &self.input_node.style;
+        let mut current_run_break_opportunities = SmallBitVec::new();
+
+        let mut components = vec![];
+        macro_rules! flush_run {
+            () => {{
+                if !current_run.is_empty() {
+                    components.push(ParagraphComponent::TextRun {
+                        style: current_run_style.clone(),
+                        text: current_run.into_boxed_str(),
+                        break_opportunities: current_run_break_opportunities,
+                    });
+                    current_run_style = style_stack.last().unwrap();
+                    current_run = String::new();
+                    current_run_break_opportunities = SmallBitVec::new();
+                    current_run_offset = 0;
+                }
+            }}
+        };
+
+        for item in &self.items {
+            match *item {
+                InlineItem::Replaced(..) => {
+                    flush_run!();
+                },
+                InlineItem::AtomicInline(..) => {
+                    flush_run!();
+                },
+                InlineItem::TagStart(node) => {
+                    let style = &self.context.layout_tree[node].style;
+                    style_stack.push(style);
+                    if current_run.is_empty() ||
+                        !can_continue_run(current_run_style, style, /* at_beginning = */ true)
+                    {
+                        flush_run!();
+                    } else {
+                        // TODO(emilio): Maybe record somewhere where the inline
+                        // box starts in the run? Either here, or in a separate
+                        // data structure, or $something.
+                        //
+                        // Though perhaps we can just lay out doing something
+                        // like:
+                        //
+                        //   for each item {
+                        //     if it's an atomic inline / replaced {
+                        //       lay it out, try to fit, break if needed
+                        //     }
+                        //     if it's an inline box {
+                        //       do border / margin / padding stuff
+                        //     }
+                        //     if it's text {
+                        //       consume text run up until the point of
+                        //       breaking...
+                        //     }
+                    }
+                },
+                InlineItem::TagEnd(..) => {
+                    let style = style_stack.pop().unwrap();
+                    if !can_continue_run(current_run_style, style, /* at_beginning = */ false) {
+                        flush_run!();
+                    }
+                },
+                InlineItem::Text(ref string) => {
+                    current_run_break_opportunities.resize(current_run_offset + string.len(), false);
+                    // TODO: Avoid line-breaking work when nowrap / etc are in
+                    // effect? Also probably do a simplified line-breaking when
+                    // pre-wrap and so on?
+                    loop {
+                        let (result, hard_break) = breaker.next(string);
+                        current_run.push_str(&string[current_run_offset..result]);
+                        if hard_break {
+                            flush_run!();
+                            components.push(ParagraphComponent::HardBreak);
+                        } else {
+                            current_run_offset += result;
+                            current_run_break_opportunities.set(current_run_offset + result, true);
+                            if result == string.len() {
+                                break;
+                            }
+                        }
+                    }
+                },
+            }
+        }
+
+        #[allow(unused_assignments)]
+        {
+            flush_run!();
+        }
+
+        components
+    }
+
     fn split_bidi(&mut self) {
         // TODO: Keep track of bidi levels within the text items.
         // https://drafts.csswg.org/css-writing-modes-3/#bidi-algo
         // https://drafts.csswg.org/css-writing-modes-3/#unicode-bidi
     }
+
+    /*
+    fn build_lines(&mut self, constraints: &ConstraintSpace) -> Vec<ChildFragment> {
+        let mut breaker = LineBreaker::new(self, constraints);
+        while line_breaker.break_next() {
+            // TODO(emilio): At some point we'll have to signal a forced stop
+            // (as in, ran out of space in the fragmentainer), and propagate the
+            // necessary data back up, saving as much stuff as necessary.
+        }
+        line_breaker.finish()
+    }
+    */
 }
 
 impl<'a, 'b> super::LayoutAlgorithm for InlineFormattingContext<'a, 'b> {
@@ -251,6 +555,9 @@ impl<'a, 'b> super::LayoutAlgorithm for InlineFormattingContext<'a, 'b> {
         self.collect_inline_items_in(self.input_node);
         self.collapse_spaces();
         self.split_bidi();
+        let components = self.line_break_and_split_for_shaping();
+        println!("{:#?}", components);
+        // self.build_lines(constraints);
 
         unimplemented!();
     }

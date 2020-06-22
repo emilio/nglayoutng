@@ -29,7 +29,7 @@ pub enum ContainerFragmentKind {
 ///
 /// A single fragment is immutable, and has no positioning information.
 pub enum FragmentKind {
-    Text {
+    TextRun {
         content: String,
     },
     Container {
