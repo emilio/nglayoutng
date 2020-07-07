@@ -6,6 +6,6 @@
 │  │  │  │  │  ├─ Inline
 │  │  │  │  │  │  ├─ Text { text: "f" }
 │  │  │  │  │  ├─ Inline
-│  │  │  │  │  │  ├─ Text { text: "i" }
+│  │  │  │  │  │  ├─ Text { text: "iona" }
 │  │  │  │  ├─ Block (ifc) (InlineInsideBlockWrapper)
 │  │  │  │  │  ├─ Text { text: "\n" }
