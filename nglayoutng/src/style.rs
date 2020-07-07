@@ -243,6 +243,118 @@ pub enum TextOrientation {
     Sideways,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
+pub enum FontWeight {
+    Normal,
+    Bold,
+    // TODO: Numbers
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
+pub enum FontStyle {
+    Normal,
+    Italic,
+    // TODO: Oblique <angle>
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Keyword)]
+pub enum GenericFamily {
+    Serif,
+    SansSerif,
+    Monospace,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum FontFamilyNameSyntax {
+    Quoted,
+    Identifiers,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NamedFamily {
+    name: String,
+    syntax: FontFamilyNameSyntax,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SingleFontFamily {
+    Generic(GenericFamily),
+    Named(NamedFamily),
+}
+
+impl SingleFontFamily {
+    pub fn parse<'i, 't>(
+        input: &mut cssparser::Parser<'i, 't>,
+    ) -> Result<Self, crate::css::ParseError<'i>> {
+        if let Ok(name) = input.try_parse(|input| input.expect_string_cloned()) {
+            return Ok(SingleFontFamily::Named(NamedFamily {
+                name: name.as_ref().to_owned(),
+                syntax: FontFamilyNameSyntax::Quoted,
+            }))
+        }
+
+        if let Ok(generic) = input.try_parse(GenericFamily::parse) {
+            return Ok(SingleFontFamily::Generic(generic));
+        }
+
+        let first_ident = input.expect_ident()?;
+        let reserved = match_ignore_ascii_case! { &first_ident,
+            // https://drafts.csswg.org/css-fonts/#propdef-font-family
+            // "Font family names that happen to be the same as a keyword value
+            //  (`inherit`, `serif`, `sans-serif`, `monospace`, `fantasy`, and `cursive`)
+            //  must be quoted to prevent confusion with the keywords with the same names.
+            //  The keywords ‘initial’ and ‘default’ are reserved for future use
+            //  and must also be quoted when used as font names.
+            //  UAs must not consider these keywords as matching the <family-name> type."
+            "inherit" | "initial" | "unset" | "revert" | "default" => true,
+            _ => false,
+        };
+
+        let mut value = first_ident.as_ref().to_owned();
+        let mut serialize_quoted = value.contains(' ');
+
+        // These keywords are not allowed by themselves.
+        // The only way this value can be valid with with another keyword.
+        if reserved {
+            let ident = input.expect_ident()?;
+            serialize_quoted = serialize_quoted || ident.contains(' ');
+            value.push(' ');
+            value.push_str(&ident);
+        }
+
+        while let Ok(ident) = input.try_parse(|i| i.expect_ident_cloned()) {
+            serialize_quoted = serialize_quoted || ident.contains(' ');
+            value.push(' ');
+            value.push_str(&ident);
+        }
+        let syntax = if serialize_quoted {
+            // For font family names which contains special white spaces, e.g.
+            // `font-family: \ a\ \ b\ \ c\ ;`, it is tricky to serialize them
+            // as identifiers correctly. Just mark them quoted so we don't need
+            // to worry about them in serialization code.
+            FontFamilyNameSyntax::Quoted
+        } else {
+            FontFamilyNameSyntax::Identifiers
+        };
+        Ok(SingleFontFamily::Named(NamedFamily {
+            name: value,
+            syntax,
+        }))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FontFamilyList(Box<[SingleFontFamily]>);
+
+impl FontFamilyList {
+    pub fn parse<'i, 't>(
+        input: &mut cssparser::Parser<'i, 't>,
+    ) -> Result<Self, crate::css::ParseError<'i>> {
+        let families = input.parse_comma_separated(SingleFontFamily::parse)?;
+        Ok(FontFamilyList(families.into_boxed_slice()))
+    }
+}
+
 /// A percentage in the range 0.0..1.0.
 #[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub struct Percentage(pub f32);
@@ -428,6 +540,10 @@ pub struct MutableComputedStyle {
     pub left: LengthPercentage,
 
     pub white_space: WhiteSpace,
+
+    pub font_family: FontFamilyList,
+    pub font_style: FontStyle,
+    pub font_weight: FontWeight,
 }
 
 impl MutableComputedStyle {
@@ -552,6 +668,10 @@ impl ComputedStyle {
             left: Default::default(),
 
             white_space: WhiteSpace::Normal,
+
+            font_family: FontFamilyList(Box::new([SingleFontFamily::Generic(GenericFamily::Serif)])),
+            font_style: FontStyle::Normal,
+            font_weight: FontWeight::Normal,
         }
     }
 
