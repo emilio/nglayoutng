@@ -1,0 +1,155 @@
+ChildFragment {
+    offset: LogicalPoint(H LTR (i0px, b0px)),
+    fragment: Fragment {
+        size: LogicalSize(H LTR, i800px×b0px),
+        style: ComputedStyle(
+            MutableComputedStyle {
+                pseudo: Some(
+                    Viewport,
+                ),
+                writing_mode: (empty),
+                display: Display {
+                    outside: Block,
+                    inside: Flow,
+                    is_list_item: false,
+                },
+                original_display: Display {
+                    outside: Block,
+                    inside: Flow,
+                    is_list_item: false,
+                },
+                computed_writing_mode: HorizontalTb,
+                position: Static,
+                box_sizing: ContentBox,
+                float: None,
+                clear: None,
+                overflow_x: Visible,
+                overflow_y: Visible,
+                direction: Ltr,
+                text_orientation: Mixed,
+                color: RGBA {
+                    red: 0,
+                    green: 0,
+                    blue: 0,
+                    alpha: 255,
+                },
+                background_color: RGBA(
+                    RGBA {
+                        red: 0,
+                        green: 0,
+                        blue: 0,
+                        alpha: 0,
+                    },
+                ),
+                width: Keyword(
+                    Auto,
+                ),
+                height: Keyword(
+                    Auto,
+                ),
+                min_width: Keyword(
+                    Auto,
+                ),
+                min_height: Keyword(
+                    Auto,
+                ),
+                max_width: Keyword(
+                    Auto,
+                ),
+                max_height: Keyword(
+                    Auto,
+                ),
+                padding_top: LengthPercentage {
+                    fixed: Length(
+                        0px,
+                    ),
+                    percentage: None,
+                },
+                padding_right: LengthPercentage {
+                    fixed: Length(
+                        0px,
+                    ),
+                    percentage: None,
+                },
+                padding_bottom: LengthPercentage {
+                    fixed: Length(
+                        0px,
+                    ),
+                    percentage: None,
+                },
+                padding_left: LengthPercentage {
+                    fixed: Length(
+                        0px,
+                    ),
+                    percentage: None,
+                },
+                margin_top: Auto,
+                margin_right: Auto,
+                margin_bottom: Auto,
+                margin_left: Auto,
+                border_top_width: Length(
+                    0px,
+                ),
+                border_right_width: Length(
+                    0px,
+                ),
+                border_bottom_width: Length(
+                    0px,
+                ),
+                border_left_width: Length(
+                    0px,
+                ),
+                border_top_style: None,
+                border_right_style: None,
+                border_bottom_style: None,
+                border_left_style: None,
+                border_top_color: CurrentColor,
+                border_right_color: CurrentColor,
+                border_bottom_color: CurrentColor,
+                border_left_color: CurrentColor,
+                top: LengthPercentage {
+                    fixed: Length(
+                        0px,
+                    ),
+                    percentage: None,
+                },
+                right: LengthPercentage {
+                    fixed: Length(
+                        0px,
+                    ),
+                    percentage: None,
+                },
+                bottom: LengthPercentage {
+                    fixed: Length(
+                        0px,
+                    ),
+                    percentage: None,
+                },
+                left: LengthPercentage {
+                    fixed: Length(
+                        0px,
+                    ),
+                    percentage: None,
+                },
+                white_space: Normal,
+                font_size: Length(
+                    16px,
+                ),
+                font_family: FontFamilyList(
+                    [
+                        Generic(
+                            Serif,
+                        ),
+                    ],
+                ),
+                font_style: Normal,
+                font_weight: Normal,
+                line_height: Normal,
+            },
+        ),
+        kind: Container {
+            kind: Line,
+            children: [],
+        },
+    },
+}

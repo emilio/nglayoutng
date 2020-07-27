@@ -272,7 +272,7 @@ enum FontFamilyNameSyntax {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NamedFamily {
-    name: String,
+    pub name: String,
     syntax: FontFamilyNameSyntax,
 }
 
@@ -346,6 +346,14 @@ impl SingleFontFamily {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FontFamilyList(Box<[SingleFontFamily]>);
 
+impl std::ops::Deref for FontFamilyList {
+    type Target = [SingleFontFamily];
+
+    fn deref(&self) -> &Self::Target {
+        &*self.0
+    }
+}
+
 impl FontFamilyList {
     pub fn parse<'i, 't>(
         input: &mut cssparser::Parser<'i, 't>,
@@ -365,6 +373,17 @@ pub struct Length(pub Au);
 impl Length {
     pub fn is_zero(&self) -> bool {
         (self.0).0 == 0
+    }
+
+    pub fn to_f32_px(self) -> f32 {
+        self.0.to_f32_px()
+    }
+}
+
+impl std::fmt::Display for Length {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.to_f32_px().fmt(f)?;
+        "px".fmt(f)
     }
 }
 
@@ -486,6 +505,27 @@ impl PseudoElement {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum LineHeight {
+    Normal,
+    Number(f32),
+    Length(LengthPercentage),
+}
+
+impl LineHeight {
+    pub fn parse<'i>(
+        input: &mut cssparser::Parser<'i, '_>,
+    ) -> Result<Self, crate::css::ParseError<'i>> {
+        if input.try_parse(|i| i.expect_ident_matching("normal")).is_ok() {
+            return Ok(LineHeight::Normal);
+        }
+        if let Ok(number) = input.try_parse(|i| i.expect_number()) {
+            return Ok(LineHeight::Number(number));
+        }
+        crate::css::parse_length_or_percentage(input).map(LineHeight::Length)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct MutableComputedStyle {
     pub pseudo: Option<PseudoElement>,
     pub writing_mode: logical_geometry::WritingMode,
@@ -549,12 +589,23 @@ pub struct MutableComputedStyle {
 
     pub white_space: WhiteSpace,
 
+    pub font_size: Length,
     pub font_family: FontFamilyList,
     pub font_style: FontStyle,
     pub font_weight: FontWeight,
+    pub line_height: LineHeight,
 }
 
 impl MutableComputedStyle {
+    pub fn set_named_font_family(&mut self, name: impl Into<String>) {
+        self.font_family = FontFamilyList(Box::new([
+            SingleFontFamily::Named(NamedFamily {
+                name: name.into(),
+                syntax: FontFamilyNameSyntax::Quoted,
+            })
+        ]))
+    }
+
     /// Finish mutating this style.
     pub fn finish(mut self, is_root_element: bool) -> ComputedStyle {
         self.original_display = self.display;
@@ -677,9 +728,11 @@ impl ComputedStyle {
 
             white_space: WhiteSpace::Normal,
 
+            font_size: Length(Au::from_px(16)),
             font_family: FontFamilyList(Box::new([SingleFontFamily::Generic(GenericFamily::Serif)])),
             font_style: FontStyle::Normal,
             font_weight: FontWeight::Normal,
+            line_height: LineHeight::Normal,
         }
     }
 
@@ -691,9 +744,11 @@ impl ComputedStyle {
             computed_writing_mode: self.computed_writing_mode,
             color: self.color,
             white_space: self.white_space,
+            font_size: self.font_size,
             font_family: self.font_family.clone(),
             font_style: self.font_style,
             font_weight: self.font_weight,
+            line_height: self.line_height.clone(),
             ..Self::initial()
         }
     }
@@ -782,5 +837,9 @@ impl ComputedStyle {
 
     pub fn border_widths(&self) -> LogicalMargin<Au> {
         LogicalMargin::from_physical(self.writing_mode, self.physical_border_widths())
+    }
+
+    pub fn first_available_font_metrics(&self) -> crate::fonts::metrics::FontMetrics {
+        crate::fonts::metrics::FontMetrics::from_style(self)
     }
 }

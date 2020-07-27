@@ -224,7 +224,7 @@ fn parse_length<'i>(input: &mut Parser<'i, '_>) -> Result<style::Length, ParseEr
     }
 }
 
-fn parse_length_or_percentage<'i>(
+pub(crate) fn parse_length_or_percentage<'i>(
     input: &mut Parser<'i, '_>,
 ) -> Result<style::LengthPercentage, ParseError<'i>> {
     let location = input.current_source_location();

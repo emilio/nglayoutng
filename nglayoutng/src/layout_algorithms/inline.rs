@@ -88,7 +88,7 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
         // avail inline size.
         let size = LogicalSize::new(wm, self.constraints.available_size.inline(), max_block_size);
 
-        // TODO: Vertical alignment of items. Here or when we're done with all
+        // TODO: Vertical alignment of items? Here or when we're done with all
         // lines?
         let offset = LogicalPoint::new(wm, Au(0), self.consumed_block_offset);
 
@@ -110,11 +110,11 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
         self.current_line_available_size = self.constraints.available_size.inline();
     }
 
-    fn layout_atomic_inline(&mut self, node: LayoutNodeId) -> ChildFragment {
+    fn layout_atomic_inline(&mut self, _: LayoutNodeId) -> ChildFragment {
         unimplemented!()
     }
 
-    fn layout_replaced(&mut self, node: LayoutNodeId) -> ChildFragment {
+    fn layout_replaced(&mut self, _: LayoutNodeId) -> ChildFragment {
         unimplemented!()
     }
 
@@ -130,7 +130,7 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
                     self.current_position.advance_item();
                     continue;
                 },
-                InlineItem::TagEnd(node) => {
+                InlineItem::TagEnd(..) => {
                     self.style_stack.pop();
                     self.current_position.advance_item();
                     continue;
@@ -149,6 +149,7 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
                     let mut paragraph = Cow::Borrowed(&text[self.current_position.text_start..]);
 
                     let style = self.style_stack.last().unwrap();
+
                     // Look to following elements for text to collect.
                     // A text run may be made of various text items, or various
                     // inline items etc. We try to shape in "paragraph"
@@ -248,7 +249,7 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
                     if log_enabled!(log::Level::Trace) {
                         trace!("Broken:");
                         let mut start = 0;
-                        for (i, c) in paragraph.bytes().enumerate() {
+                        for i in 0..paragraph.as_bytes().len() {
                             if !break_opportunities[i] {
                                 continue;
                             }
@@ -258,7 +259,7 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
                         trace!("{}", &paragraph[start..]);
                     }
 
-                    // let shaped_run = super::shaping::shape(&paragraph, style);
+                    // let shaped_run = crate::fonts::shaping::shape(&paragraph, style);
                     //
                     // TODO:
                     // break_and_shape_text(text, style);
@@ -289,8 +290,6 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
                 continue;
             }
         }
-
-        true
     }
 
     fn break_and_finish(mut self) -> LayoutResult {

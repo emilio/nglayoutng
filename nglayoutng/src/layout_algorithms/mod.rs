@@ -1,6 +1,5 @@
 pub mod block;
 pub mod inline;
-pub mod shaping;
 
 use crate::fragment_tree::ChildFragment;
 use crate::layout_tree::LayoutTree;
