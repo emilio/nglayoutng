@@ -407,11 +407,19 @@ pub enum LengthPercentageOrAuto {
 }
 
 impl LengthPercentageOrAuto {
+    pub fn is_auto(&self) -> bool {
+        matches!(*self, Self::Auto)
+    }
+
     pub fn is_zero(&self) -> bool {
         match *self {
             LengthPercentageOrAuto::LengthPercentage(ref lp) => lp.is_zero(),
             LengthPercentageOrAuto::Auto => false,
         }
+    }
+
+    pub fn is_zero_or_auto(&self) -> bool {
+        self.is_auto() || self.is_zero()
     }
 }
 
@@ -683,6 +691,9 @@ impl ComputedStyle {
             computed_writing_mode: self.computed_writing_mode,
             color: self.color,
             white_space: self.white_space,
+            font_family: self.font_family.clone(),
+            font_style: self.font_style,
+            font_weight: self.font_weight,
             ..Self::initial()
         }
     }

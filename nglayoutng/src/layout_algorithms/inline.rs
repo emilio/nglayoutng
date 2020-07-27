@@ -184,14 +184,15 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
                     // shaping result, and carry on.
                     let mut advance = 1;
                     loop {
-                        let item = match self.fc.items.get(self.current_position.item_index + advance) {
+                        let following_item = match self.fc.items.get(self.current_position.item_index + advance) {
                             Some(item) => item,
                             None => break,
                         };
 
-                        match *item {
+                        match *following_item {
                             InlineItem::TagStart(node) => {
                                 if !can_continue_run(style, &self.fc.context.layout_tree[node].style, /* at_beginning = */ true) {
+                                    trace!("Can't continue run with {:?} at start", following_item);
                                     break;
                                 }
                                 // TODO(emilio): We probably need to record some
@@ -199,6 +200,7 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
                             },
                             InlineItem::TagEnd(node) => {
                                 if !can_continue_run(style, &self.fc.context.layout_tree[node].style, /* at_beginning = */ false) {
+                                    trace!("Can't continue run with {:?} at end", following_item);
                                     break;
                                 }
                                 // TODO(emilio): We probably need to record some
@@ -232,6 +234,7 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
                     // avoid doing this, or do a simplified version of this,
                     // when different white-space values are in-use like nowrap
                     // and so on...
+                    trace!("Breaking {:?}", paragraph);
                     loop {
                         let (result, _hard_break) = breaker.next(&*paragraph);
                         if result == paragraph.len() {
@@ -242,13 +245,27 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
                         // Maybe just truncating the paragraph and carrying on?
                     }
 
-                    let shaped_run = super::shaping::shape(&paragraph, style);
+                    if log_enabled!(log::Level::Trace) {
+                        trace!("Broken:");
+                        let mut start = 0;
+                        for (i, c) in paragraph.bytes().enumerate() {
+                            if !break_opportunities[i] {
+                                continue;
+                            }
+                            trace!("{}", &paragraph[start..i]);
+                            start = i;
+                        }
+                        trace!("{}", &paragraph[start..]);
+                    }
 
+                    // let shaped_run = super::shaping::shape(&paragraph, style);
+                    //
                     // TODO:
                     // break_and_shape_text(text, style);
                     // advance_as_needed()
                     // return Some(break);
-                    unimplemented!()
+                    // unimplemented!()
+                    self.current_position.item_index += advance;
                 }
             }
         }
@@ -312,6 +329,7 @@ pub struct InlineFormattingContext<'a, 'b> {
 
 /// An item we do inline layout on. Each of these correspond roughly to the
 /// (rendered) DOM.
+#[derive(Debug)]
 enum InlineItem {
     // The start of a nested inline box.
     TagStart(LayoutNodeId),
@@ -378,14 +396,14 @@ fn can_continue_run(run_style: &ComputedStyle, new_style: &ComputedStyle, at_beg
         (margin.inline_end, padding.inline_end, border.inline_end)
     };
 
-    if !margin.is_zero() || !padding.is_zero() || border.0 != 0 {
+    if !margin.is_zero_or_auto() || !padding.is_zero() || border.0 != 0 {
         return false;
     }
 
     // TODO: vertical-align is not baseline
     // TODO: The boundary is a bidi isolation boundary.
-    //
     // TODO: line-break / word-break / maybe white-space: nowrap-ness?
+    // TODO: Definitely different fonts and such.
 
     true
 }

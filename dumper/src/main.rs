@@ -59,7 +59,7 @@ fn main() {
     match kind {
         DumpKind::Layout => {
             let result = result.layout_tree.layout(result.dom.as_document().unwrap().quirks_mode(), euclid::Size2D::new(Au::from_f32_px(800.0), Au::from_f32_px(600.0)));
-            println!("{:?}", result.fragment);
+            println!("{:#?}", result.fragment);
         },
         DumpKind::LayoutTree => result.layout_tree.print(),
         DumpKind::Dom => print_dom(&result.dom),
