@@ -1,15 +1,14 @@
 #[macro_use]
 extern crate clap;
-extern crate env_logger;
-extern crate log;
-extern crate nglayoutng;
 
+use app_units::Au;
 use nglayoutng::dom::print_dom;
 use nglayoutng::layout_tree::builder::LayoutTreeBuilder;
 use std::fs::File;
 
 enum DumpKind {
     Layout,
+    LayoutTree,
     Dom,
 }
 
@@ -21,6 +20,11 @@ fn main() {
     let args = app_from_crate!()
         .subcommand(
             SubCommand::with_name("layout")
+                .about("Dumps a fragment tree from an HTML document")
+                .arg_from_usage("<input>  'The document to build the tree for'"),
+        )
+        .subcommand(
+            SubCommand::with_name("layout-tree")
                 .about("Dumps a layout tree from an HTML document")
                 .arg_from_usage("<input>  'The document to build the tree for'"),
         )
@@ -35,6 +39,9 @@ fn main() {
         if let Some(args) = args.subcommand_matches("layout") {
             let input = args.value_of("input").unwrap();
             (input, DumpKind::Layout)
+        } else if let Some(args) = args.subcommand_matches("layout-tree") {
+            let input = args.value_of("input").unwrap();
+            (input, DumpKind::LayoutTree)
         } else if let Some(args) = args.subcommand_matches("dom") {
             let input = args.value_of("input").unwrap();
             (input, DumpKind::Dom)
@@ -50,7 +57,11 @@ fn main() {
     let result = builder.build();
     result.layout_tree.assert_consistent();
     match kind {
-        DumpKind::Layout => result.layout_tree.print(),
+        DumpKind::Layout => {
+            let result = result.layout_tree.layout(result.dom.as_document().unwrap().quirks_mode(), euclid::Size2D::new(Au::from_f32_px(800.0), Au::from_f32_px(600.0)));
+            println!("{:?}", result.fragment);
+        },
+        DumpKind::LayoutTree => result.layout_tree.print(),
         DumpKind::Dom => print_dom(&result.dom),
     }
 }

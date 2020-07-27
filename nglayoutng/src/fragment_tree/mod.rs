@@ -4,6 +4,7 @@ use app_units::Au;
 
 /// A child fragment contains a given fragment and an offset relative to the
 /// parent fragment.
+#[derive(Debug)]
 pub struct ChildFragment {
     /// The offset relative to the parent fragment's origin.
     pub offset: LogicalPoint<Au>,
@@ -13,6 +14,7 @@ pub struct ChildFragment {
     pub fragment: Box<Fragment>,
 }
 
+#[derive(Debug)]
 pub enum ContainerFragmentKind {
     Box {
         // TODO(emilio): Surely stuff will be needed here.
@@ -28,6 +30,7 @@ pub enum ContainerFragmentKind {
 /// tree.
 ///
 /// A single fragment is immutable, and has no positioning information.
+#[derive(Debug)]
 pub enum FragmentKind {
     TextRun {
         content: String,
@@ -41,6 +44,7 @@ pub enum FragmentKind {
 /// A fragment is part of the result of layout, and it's immutable.
 ///
 /// It contains only the sizing information, children are stored in .
+#[derive(Debug)]
 pub struct Fragment {
     /// The physical size of this fragment.
     pub size: LogicalSize<Au>,

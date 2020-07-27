@@ -93,7 +93,7 @@ impl<'a, 'b> BlockFormattingContext<'a, 'b> {
                 child.layout(self.context, &children_constraints)
             } else {
                 debug_assert!(child.is_block_container());
-                self.layout_block_children_of(state, node, &children_constraints)
+                self.layout_block_children_of(state, child, &children_constraints)
             };
             child_result.root_fragment.offset.b = state.current_offset;
             state.current_offset += child_result.root_fragment.fragment.size.block;

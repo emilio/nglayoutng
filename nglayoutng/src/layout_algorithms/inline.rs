@@ -37,6 +37,7 @@ struct LineBreaker<'a, 'b, 'c> {
     constraints: &'a ConstraintSpace,
     style_stack: Vec<&'a ComputedStyle>,
     lines: Vec<ChildFragment>,
+    consumed_block_offset: Au,
     current_line: Vec<ChildFragment>,
     current_line_available_size: Au,
     current_line_max_block_size: Au,
@@ -47,11 +48,14 @@ struct LineBreaker<'a, 'b, 'c> {
 
 impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
     fn new(fc: &'a mut InlineFormattingContext<'b, 'c>, constraints: &'a ConstraintSpace) -> Self {
+        let mut style_stack = vec![];
+        style_stack.push(&fc.input_node.style);
         Self {
             fc,
             constraints,
-            style_stack: vec![],
+            style_stack,
             lines: vec![],
+            consumed_block_offset: Au(0),
             current_line: vec![],
             current_line_available_size: constraints.available_size.inline(),
             current_line_max_block_size: Au(0),
@@ -82,13 +86,16 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
         //
         // TODO: Line box size may be affected by floats, may not always be the
         // avail inline size.
-        let size = LogicalSize::new(wm, self.constraints.available_size.inline(), self.current_line_max_block_size);
+        let size = LogicalSize::new(wm, self.constraints.available_size.inline(), max_block_size);
 
         // TODO: Vertical alignment of items. Here or when we're done with all
         // lines?
+        let offset = LogicalPoint::new(wm, Au(0), self.consumed_block_offset);
+
+        self.consumed_block_offset += size.block;
 
         self.lines.push(ChildFragment {
-            offset: LogicalPoint::zero(wm),
+            offset,
             fragment: Box::new(Fragment {
                 size,
                 style: style.clone(),
@@ -219,7 +226,7 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
                     break_opportunities.resize(paragraph.len(), false);
 
                     // Try to grab a whole text run and line-break / shape it.
-                    let mut breaker = xi_unicode::LineBreakLeafIter::new("", 0);
+                    let mut breaker = xi_unicode::LineBreakLeafIter::new(&*paragraph, 0);
 
                     // TODO(emilio): There are optimizations here we could do to
                     // avoid doing this, or do a simplified version of this,
@@ -267,6 +274,15 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
         }
 
         true
+    }
+
+    fn break_and_finish(mut self) -> LayoutResult {
+        while self.break_next() {
+            // TODO(emilio): At some point we'll have to signal a forced stop
+            // (as in, ran out of space in the fragmentainer), and propagate the
+            // necessary data back up, saving up as much stuff as necessary.
+        }
+        self.finish()
     }
 
     fn finish(self) -> LayoutResult {
@@ -560,19 +576,13 @@ impl<'a, 'b> InlineFormattingContext<'a, 'b> {
     }
 
     fn do_layout(&mut self, constraints: &ConstraintSpace) -> LayoutResult {
-        let mut breaker = LineBreaker::new(self, constraints);
-        while breaker.break_next() {
-            // TODO(emilio): At some point we'll have to signal a forced stop
-            // (as in, ran out of space in the fragmentainer), and propagate the
-            // necessary data back up, saving up as much stuff as necessary.
-        }
-        breaker.finish()
+        LineBreaker::new(self, constraints).break_and_finish()
     }
 }
 
 impl<'a, 'b> super::LayoutAlgorithm for InlineFormattingContext<'a, 'b> {
     fn layout(&mut self, constraints: &ConstraintSpace) -> LayoutResult {
-        debug_assert!(!self.input_node.establishes_ifc(self.context.layout_tree));
+        debug_assert!(self.input_node.establishes_ifc(self.context.layout_tree));
 
         self.collect_inline_items_in(self.input_node);
         self.collapse_spaces();
