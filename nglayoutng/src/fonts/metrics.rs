@@ -1,46 +1,5 @@
 use crate::Au;
-use crate::style::{ComputedStyle, Length, SingleFontFamily, GenericFamily, FontStyle, FontWeight};
-use font_kit::{
-    loaders::freetype::Font,
-    source::SystemSource,
-};
-
-fn best_font(style: &ComputedStyle) -> Font {
-    use font_kit::family_name::FamilyName;
-    use font_kit::properties::{Properties, Weight, Style};
-
-    fn to_font_kit_family(f: &SingleFontFamily) -> FamilyName {
-        match *f {
-            SingleFontFamily::Generic(ref g) => match *g {
-                GenericFamily::Serif => FamilyName::Serif,
-                GenericFamily::SansSerif => FamilyName::SansSerif,
-                GenericFamily::Monospace => FamilyName::Monospace,
-            },
-            SingleFontFamily::Named(ref named) => {
-                FamilyName::Title(named.name.clone())
-            },
-        }
-    }
-
-    let mut font_kit_families =
-        style.font_family.iter().map(to_font_kit_family).collect::<Vec<_>>();
-
-    // Always append a last resort font.
-    font_kit_families.push(FamilyName::Serif);
-
-    let mut properties = Properties::new();
-    properties
-        .style(match style.font_style {
-            FontStyle::Normal => Style::Normal,
-            FontStyle::Italic => Style::Italic,
-        })
-        .weight(match style.font_weight {
-            FontWeight::Normal => Weight::NORMAL,
-            FontWeight::Bold => Weight::BOLD,
-        });
-
-    SystemSource::new().select_best_match(&font_kit_families, &properties).unwrap().load().unwrap()
-}
+use crate::style::{ComputedStyle, Length};
 
 pub struct FontMetrics {
     metrics: font_kit::metrics::Metrics,
@@ -79,7 +38,8 @@ impl FontMetrics {
 
 impl FontMetrics {
     pub fn from_style(style: &ComputedStyle) -> Self {
-        let font = best_font(style);
+        let mut loader = super::loader::Loader::new(style);
+        let font = loader.first_available_font();
         trace!("FontMetrics::from_style() -> {}", font.full_name());
         FontMetrics {
             metrics: font.metrics(),

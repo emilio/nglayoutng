@@ -14,53 +14,42 @@ struct InlineItemPosition {
     /// The index of the item, may be one past the end to represent "the whole
     /// range".
     item_index: usize,
-    /// The byte index of the line break inside the given text string.
-    text_start: usize,
 }
 
 impl InlineItemPosition {
     fn start() -> Self {
         Self {
             item_index: 0,
-            text_start: 0,
         }
     }
 
     fn advance_item(&mut self) {
         self.item_index += 1;
-        self.text_start = 0;
     }
 }
 
 struct LineBreaker<'a, 'b, 'c> {
     fc: &'a InlineFormattingContext<'b, 'c>,
     constraints: &'a ConstraintSpace,
-    style_stack: Vec<&'a ComputedStyle>,
     lines: Vec<ChildFragment>,
     consumed_block_offset: Au,
     current_line: Vec<ChildFragment>,
     current_line_available_size: Au,
     current_line_max_block_size: Au,
     current_position: InlineItemPosition,
-    /// The last item we laid out, which didn't fit.
-    last_laid_out_item: Option<ChildFragment>,
 }
 
 impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
     fn new(fc: &'a mut InlineFormattingContext<'b, 'c>, constraints: &'a ConstraintSpace) -> Self {
-        let mut style_stack = vec![];
-        style_stack.push(&fc.input_node.style);
         Self {
             fc,
             constraints,
-            style_stack,
             lines: vec![],
             consumed_block_offset: Au(0),
             current_line: vec![],
             current_line_available_size: constraints.available_size.inline(),
             current_line_max_block_size: Au(0),
             current_position: InlineItemPosition::start(),
-            last_laid_out_item: None,
         }
     }
 
@@ -110,194 +99,175 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
         self.current_line_available_size = self.constraints.available_size.inline();
     }
 
-    fn layout_atomic_inline(&mut self, _: LayoutNodeId) -> ChildFragment {
+    fn layout_atomic_inline(&mut self, _: LayoutNodeId) {
         unimplemented!()
     }
 
-    fn layout_replaced(&mut self, _: LayoutNodeId) -> ChildFragment {
+    fn layout_replaced(&mut self, _: LayoutNodeId) {
         unimplemented!()
     }
 
-    fn next_item_fragment(&mut self) -> Option<ChildFragment> {
+
+    fn layout_text(&mut self, style: &ComputedStyle, start_text_item_text: &str) {
+        let mut paragraph = Cow::Borrowed(start_text_item_text);
+
+        // Look to following elements for text to collect.
+        // A text run may be made of various text items, or various
+        // inline items etc. We try to shape in "paragraph"
+        // boundaries (as in, around hard breaks, or the whole thing
+        // if there are none).
+        //
+        // Line-breaking may make us re-shape some of that text, as
+        // needed, as a result of breaking. For example, consider
+        // the following:
+        //
+        // <style>
+        // p { font-size: 10px; }
+        // ::first-line { font-size: 30px }
+        // </style>
+        // <p>This is a not-very-long paragraph</p>
+        //                           ^
+        //                           |
+        //                           +--- Break here.
+        //
+        // We need to shape with the first-line style, until we hit
+        // a break.  Once we know where to break, then we need to
+        // shape the rest of the run with the non-first-line style.
+        // This kinda sucks in multiple ways.
+        //
+        // If we know we're not dealing with ::first-line, we may
+        // still need to re-shape, if we happen to break inside a
+        // ligature, or a kerned space, see
+        // https://bugzilla.mozilla.org/show_bug.cgi?id=479829.
+        // Though that is less common.
+        //
+        // Still, in the common case, the breakpoint happens to be
+        // in a e.g. space, or other place where we can slice the
+        // shaping result, and carry on.
+        let mut advance = 1;
         loop {
-            if let Some(f) = self.last_laid_out_item.take() {
-                return Some(f);
+            let following_item = match self.fc.items.get(self.current_position.item_index + advance) {
+                Some(item) => item,
+                None => break,
+            };
+
+            match *following_item {
+                InlineItem::TagStart(node) => {
+                    if !can_continue_run(style, &self.fc.context.layout_tree[node].style, /* at_beginning = */ true) {
+                        trace!("Can't continue run with {:?} at start", following_item);
+                        break;
+                    }
+                    // TODO(emilio): We probably need to record some
+                    // state here to create the right fragment tree.
+                },
+                InlineItem::TagEnd(node) => {
+                    if !can_continue_run(style, &self.fc.context.layout_tree[node].style, /* at_beginning = */ false) {
+                        trace!("Can't continue run with {:?} at end", following_item);
+                        break;
+                    }
+                    // TODO(emilio): We probably need to record some
+                    // state here to create the right fragment tree.
+                },
+                InlineItem::Text(node, ref s) => {
+                    let text_style = &self.fc.context.layout_tree[node].style;
+                    if !can_continue_run(style, text_style, /* at_beginning = */ true) {
+                        trace!("Can't continue run with text {:?} at start", following_item);
+                        break;
+                    }
+                    paragraph.to_mut().push_str(&s);
+                    // This can only really happen with display: contents, and
+                    // text can't have margin/border/padding, so at_beginning
+                    // shouldn't matter here.
+                    debug_assert!(can_continue_run(style, text_style, /* at_beginning = */ false));
+                },
+                InlineItem::AtomicInline(..) | InlineItem::Replaced(..) => {
+                    break;
+                }
             }
+            advance += 1;
+        }
+
+        // Now we have a run of text on which we can compute break
+        // opportunities, and which we can shape with a given style.
+        //
+        // Do that, and see what fits. If stuff doesn't fit, we
+        // break at the first opportunity before that. We may need
+        // to re-shape later, but we can try to re-use the shape
+        // results from the previous run if appropriate to avoid
+        // O(n^2) algorithms.
+        let mut break_opportunities = SmallBitVec::new();
+        break_opportunities.resize(paragraph.len(), false);
+
+        // Try to grab a whole text run and line-break / shape it.
+        let mut breaker = xi_unicode::LineBreakLeafIter::new(&*paragraph, 0);
+
+        // TODO(emilio): There are optimizations here we could do to
+        // avoid doing this, or do a simplified version of this,
+        // when different white-space values are in-use like nowrap
+        // and so on...
+        trace!("Breaking {:?}", paragraph);
+        loop {
+            let (result, _hard_break) = breaker.next(&*paragraph);
+            if result == paragraph.len() {
+                break;
+            }
+            break_opportunities.set(result, true);
+            // XXX Do we need to use the hard_break bit somehow?
+            // Maybe just truncating the paragraph and carrying on?
+        }
+
+        if log_enabled!(log::Level::Trace) {
+            trace!("Broken:");
+            let mut start = 0;
+            for i in 0..paragraph.as_bytes().len() {
+                if !break_opportunities[i] {
+                    continue;
+                }
+                trace!("{}", &paragraph[start..i]);
+                start = i;
+            }
+            trace!("{}", &paragraph[start..]);
+        }
+
+        let shaped_run = crate::fonts::shaping::shape(&paragraph, style);
+        //
+        // TODO:
+        // break_and_shape_text(text, style);
+        // advance_as_needed()
+        // return Some(break);
+        // unimplemented!()
+        // Advance past all the items that we've collected items from.
+        self.current_position.item_index += advance;
+    }
+
+    fn layout_and_break(&mut self) -> Option<()> {
+        loop {
             let item = self.fc.items.get(self.current_position.item_index)?;
             match *item {
                 InlineItem::TagStart(node) => {
-                    self.style_stack.push(&self.fc.context.layout_tree[node].style);
                     self.current_position.advance_item();
-                    continue;
                 },
                 InlineItem::TagEnd(..) => {
-                    self.style_stack.pop();
                     self.current_position.advance_item();
-                    continue;
                 },
                 InlineItem::AtomicInline(node) => {
-                    let fragment = self.layout_atomic_inline(node);
+                    self.layout_atomic_inline(node);
                     self.current_position.advance_item();
-                    return Some(fragment);
                 },
                 InlineItem::Replaced(node) => {
-                    let fragment = self.layout_replaced(node);
+                    self.layout_replaced(node);
                     self.current_position.advance_item();
-                    return Some(fragment);
                 },
-                InlineItem::Text(ref text) => {
-                    let mut paragraph = Cow::Borrowed(&text[self.current_position.text_start..]);
-
-                    let style = self.style_stack.last().unwrap();
-
-                    // Look to following elements for text to collect.
-                    // A text run may be made of various text items, or various
-                    // inline items etc. We try to shape in "paragraph"
-                    // boundaries (as in, around hard breaks, or the whole thing
-                    // if there are none).
-                    //
-                    // Line-breaking may make us re-shape some of that text, as
-                    // needed, as a result of breaking. For example, consider
-                    // the following:
-                    //
-                    // <style>
-                    // p { font-size: 10px; }
-                    // ::first-line { font-size: 30px }
-                    // </style>
-                    // <p>This is a not-very-long paragraph</p>
-                    //                           ^
-                    //                           |
-                    //                           +--- Break here.
-                    //
-                    // We need to shape with the first-line style, until we hit
-                    // a break.  Once we know where to break, then we need to
-                    // shape the rest of the run with the non-first-line style.
-                    // This kinda sucks in multiple ways.
-                    //
-                    // If we know we're not dealing with ::first-line, we may
-                    // still need to re-shape, if we happen to break inside a
-                    // ligature, or a kerned space, see
-                    // https://bugzilla.mozilla.org/show_bug.cgi?id=479829.
-                    // Though that is less common.
-                    //
-                    // Still, in the common case, the breakpoint happens to be
-                    // in a e.g. space, or other place where we can slice the
-                    // shaping result, and carry on.
-                    let mut advance = 1;
-                    loop {
-                        let following_item = match self.fc.items.get(self.current_position.item_index + advance) {
-                            Some(item) => item,
-                            None => break,
-                        };
-
-                        match *following_item {
-                            InlineItem::TagStart(node) => {
-                                if !can_continue_run(style, &self.fc.context.layout_tree[node].style, /* at_beginning = */ true) {
-                                    trace!("Can't continue run with {:?} at start", following_item);
-                                    break;
-                                }
-                                // TODO(emilio): We probably need to record some
-                                // state here to create the right fragment tree.
-                            },
-                            InlineItem::TagEnd(node) => {
-                                if !can_continue_run(style, &self.fc.context.layout_tree[node].style, /* at_beginning = */ false) {
-                                    trace!("Can't continue run with {:?} at end", following_item);
-                                    break;
-                                }
-                                // TODO(emilio): We probably need to record some
-                                // state here to create the right fragment tree.
-                            },
-                            InlineItem::Text(ref s) => {
-                                paragraph.to_mut().push_str(&s);
-                            },
-                            InlineItem::AtomicInline(..) | InlineItem::Replaced(..) => {
-                                break;
-                            }
-                        }
-                        advance += 1;
-                    }
-
-                    // Now we have a run of text on which we can compute break
-                    // opportunities, and which we can shape with a given style.
-                    //
-                    // Do that, and see what fits. If stuff doesn't fit, we
-                    // break at the first opportunity before that. We may need
-                    // to re-shape later, but we can try to re-use the shape
-                    // results from the previous run if appropriate to avoid
-                    // O(n^2) algorithms.
-                    let mut break_opportunities = SmallBitVec::new();
-                    break_opportunities.resize(paragraph.len(), false);
-
-                    // Try to grab a whole text run and line-break / shape it.
-                    let mut breaker = xi_unicode::LineBreakLeafIter::new(&*paragraph, 0);
-
-                    // TODO(emilio): There are optimizations here we could do to
-                    // avoid doing this, or do a simplified version of this,
-                    // when different white-space values are in-use like nowrap
-                    // and so on...
-                    trace!("Breaking {:?}", paragraph);
-                    loop {
-                        let (result, _hard_break) = breaker.next(&*paragraph);
-                        if result == paragraph.len() {
-                            break;
-                        }
-                        break_opportunities.set(result, true);
-                        // XXX Do we need to use the hard_break bit somehow?
-                        // Maybe just truncating the paragraph and carrying on?
-                    }
-
-                    if log_enabled!(log::Level::Trace) {
-                        trace!("Broken:");
-                        let mut start = 0;
-                        for i in 0..paragraph.as_bytes().len() {
-                            if !break_opportunities[i] {
-                                continue;
-                            }
-                            trace!("{}", &paragraph[start..i]);
-                            start = i;
-                        }
-                        trace!("{}", &paragraph[start..]);
-                    }
-
-                    // let shaped_run = crate::fonts::shaping::shape(&paragraph, style);
-                    //
-                    // TODO:
-                    // break_and_shape_text(text, style);
-                    // advance_as_needed()
-                    // return Some(break);
-                    // unimplemented!()
-                    self.current_position.item_index += advance;
-                }
-            }
-        }
-    }
-
-    fn break_next(&mut self) -> bool {
-        loop {
-            // Take our next item to fit.
-            let next_fragment = match self.next_item_fragment() {
-                Some(fragment) => fragment,
-                None => {
-                    // No more fragments, we're all done.
-                    self.flush_line();
-                    return false;
+                InlineItem::Text(node, ref text) => {
+                    self.layout_text(&self.fc.context.layout_tree[node].style, text);
+                    // That could advance multiple items.
                 },
-            };
-
-            // If we're in an empty line, everything fits.
-            if self.current_line.is_empty() {
-                self.current_line.push(next_fragment);
-                continue;
             }
         }
     }
 
     fn break_and_finish(mut self) -> LayoutResult {
-        while self.break_next() {
-            // TODO(emilio): At some point we'll have to signal a forced stop
-            // (as in, ran out of space in the fragmentainer), and propagate the
-            // necessary data back up, saving up as much stuff as necessary.
-        }
+        self.layout_and_break();
         self.finish()
     }
 
@@ -334,7 +304,7 @@ enum InlineItem {
     TagStart(LayoutNodeId),
     // TODO(emilio): Probably want to reference-count this somehow, or something
     // something.
-    Text(String),
+    Text(LayoutNodeId, String),
     Replaced(LayoutNodeId),
     AtomicInline(LayoutNodeId),
     TagEnd(LayoutNodeId),
@@ -424,7 +394,7 @@ impl<'a, 'b> InlineFormattingContext<'a, 'b> {
                 LayoutNodeKind::Leaf { ref kind } => {
                     match kind {
                         LeafKind::Replaced { .. } => self.items.push(InlineItem::Replaced(id)),
-                        LeafKind::Text { ref text } => self.items.push(InlineItem::Text(text.clone().into())),
+                        LeafKind::Text { ref text } => self.items.push(InlineItem::Text(id, text.clone().into())),
                     }
                 }
                 LayoutNodeKind::Container { ref kind, .. } => {
@@ -541,26 +511,18 @@ impl<'a, 'b> InlineFormattingContext<'a, 'b> {
 
     // https://drafts.csswg.org/css-text-3/#white-space-phase-1
     fn collapse_spaces(&mut self) {
-        let mut style_stack = SmallVec::<[&_; 5]>::new();
-        style_stack.push(&self.input_node.style);
         let mut after_break = true;
         let mut after_collapsible_space = false;
         for item in &mut self.items {
-            let text = match *item {
+            let (node, text) = match *item {
                 InlineItem::Replaced(..) |
-                InlineItem::AtomicInline(..) => continue,
-                InlineItem::TagStart(node) => {
-                    style_stack.push(&self.context.layout_tree[node].style);
-                    continue;
-                },
-                InlineItem::TagEnd(..) => {
-                    style_stack.pop();
-                    continue;
-                },
-                InlineItem::Text(ref mut s) => s,
+                InlineItem::AtomicInline(..) |
+                InlineItem::TagEnd(..) |
+                InlineItem::TagStart(..) => continue,
+                InlineItem::Text(node, ref mut s) => (node, s),
             };
 
-            let style = style_stack.last().unwrap();
+            let style = &self.context.layout_tree[node].style;
             if style.white_space.collapses_spaces() {
                 let new_text = Self::collapse_spaces_in_string(
                     std::mem::replace(text, String::new()),
