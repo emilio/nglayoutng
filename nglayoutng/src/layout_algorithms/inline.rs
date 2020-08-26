@@ -1,10 +1,9 @@
 use app_units::Au;
 use crate::fragment_tree::{ChildFragment, Fragment, FragmentKind, ContainerFragmentKind};
 use crate::logical_geometry::*;
-use crate::style::ComputedStyle;
+use crate::style::{ComputedStyle, LengthPercentage, LengthPercentageOrAuto};
 use super::{ConstraintSpace, LayoutContext, LayoutResult};
 use crate::layout_tree::{LayoutNodeKind, LeafKind, ContainerKind, LayoutNode, LayoutNodeId};
-use smallvec::SmallVec;
 use smallbitvec::SmallBitVec;
 use std::borrow::Cow;
 
@@ -28,6 +27,17 @@ impl InlineItemPosition {
     }
 }
 
+struct OpenInlineBox {
+    /// The layout node that generates this inline box.
+    node: LayoutNodeId,
+    /// Whether we've generated at least one fragment for the currently open
+    /// inline box. This is useful so as to not double-account for margins /
+    /// padding and such, for example.
+    generated_fragment: bool,
+    /// The children that are not yet placed in the line.
+    children: Vec<ChildFragment>,
+}
+
 struct LineBreaker<'a, 'b, 'c> {
     fc: &'a InlineFormattingContext<'b, 'c>,
     constraints: &'a ConstraintSpace,
@@ -37,6 +47,9 @@ struct LineBreaker<'a, 'b, 'c> {
     current_line_available_size: Au,
     current_line_max_block_size: Au,
     current_position: InlineItemPosition,
+    at_break_opportunity: bool,
+    /// An stack of currently open inline boxes.
+    open_boxes: Vec<OpenInlineBox>,
 }
 
 impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
@@ -50,6 +63,8 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
             current_line_available_size: constraints.available_size.inline(),
             current_line_max_block_size: Au(0),
             current_position: InlineItemPosition::start(),
+            at_break_opportunity: false,
+            open_boxes: vec![],
         }
     }
 
@@ -57,9 +72,78 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
         self.fc.input_node.style.writing_mode
     }
 
+    fn close_box(&mut self) {
+        // TODO: We know this is the last fragment of the line, and whether it's
+        // the first, but we should keep that information in the fragment too.
+        let box_ = self.open_boxes.pop().unwrap();
+        let style = &self.fc.context.layout_tree[box_.node].style;
+        let wm = style.writing_mode;
+        let children = box_.children.into_boxed_slice();
+
+        let fragment = ChildFragment {
+            // XXX: current_inline_offset + margin_inline_start?
+            offset: LogicalPoint::zero(wm),
+            fragment: Box::new(Fragment {
+                // XXX: max height of the fragments + padding + border?
+                size: LogicalSize::zero(wm),
+                style: style.clone(),
+                kind: FragmentKind::Container {
+                    kind: ContainerFragmentKind::Box {},
+                    children,
+                },
+            })
+        };
+
+        self.push_fragment_to_line(fragment);
+    }
+
+    fn push_fragment_to_line(&mut self, fragment: ChildFragment) {
+        if let Some(ref mut last) = self.open_boxes.last_mut() {
+            last.children.push(fragment);
+        } else {
+            self.current_line.push(fragment);
+        }
+    }
+
+    fn flush_open_boxes_to_line(&mut self) {
+        let mut pending_fragment = None;
+
+        for b in self.open_boxes.iter_mut().rev() {
+            if let Some(pending_fragment) = pending_fragment.take() {
+                b.children.push(pending_fragment);
+            }
+
+            let style = &self.fc.context.layout_tree[b.node].style;
+            let wm = style.writing_mode;
+            let children = std::mem::replace(&mut b.children, vec![]).into_boxed_slice();
+            let fragment = ChildFragment {
+                // XXX: current_inline_offset + margin_inline_start?
+                offset: LogicalPoint::zero(wm),
+                fragment: Box::new(Fragment {
+                    // XXX: max height of the fragments + padding + border?
+                    size: LogicalSize::zero(wm),
+                    style: style.clone(),
+                    kind: FragmentKind::Container {
+                        kind: ContainerFragmentKind::Box {},
+                        children,
+                    },
+                })
+            };
+
+            b.generated_fragment = true;
+            pending_fragment = Some(fragment);
+        }
+
+        if let Some(pending_fragment) = pending_fragment {
+            self.current_line.push(pending_fragment);
+        }
+    }
+
     fn flush_line(&mut self) {
+        self.flush_open_boxes_to_line();
+
         if self.current_line.is_empty() {
-            return;
+            return; // XXX Do we need to create empty lines in any case?
         }
 
         let line_fragments = std::mem::replace(&mut self.current_line, vec![]);
@@ -97,6 +181,7 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
 
         // Go to the next line.
         self.current_line_available_size = self.constraints.available_size.inline();
+        self.at_break_opportunity = false;
     }
 
     fn layout_atomic_inline(&mut self, _: LayoutNodeId) {
@@ -107,9 +192,40 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
         unimplemented!()
     }
 
+    fn can_fit(&self, inline_size: Au) -> bool {
+        !self.at_break_opportunity ||
+            self.current_line_available_size >= inline_size
+    }
 
-    fn layout_text(&mut self, style: &ComputedStyle, start_text_item_text: &str) {
+    fn resolve_padding(&self, lp: &LengthPercentage) -> Au {
+        self.resolve_padding_margin(lp)
+    }
+
+    fn resolve_padding_margin(&self, lp: &LengthPercentage) -> Au {
+        lp.resolve(self.constraints.percentage_resolution_size.inline())
+    }
+
+    fn resolve_margin(&self, margin: &LengthPercentageOrAuto) -> Au {
+        match *margin {
+            LengthPercentageOrAuto::Auto => Au(0),
+            LengthPercentageOrAuto::LengthPercentage(ref lp) => {
+                self.resolve_padding_margin(lp)
+            },
+        }
+    }
+
+    fn layout_inline_box(&mut self, style: &ComputedStyle, start_text_item_text: &str) {
         let mut paragraph = Cow::Borrowed(start_text_item_text);
+
+        // let wm = style.writing_mode;
+
+        let margin_start = self.resolve_margin(style.margin().inline_end);
+
+        let mut mbp_start = margin_start +
+            style.border_widths().inline_start +
+            self.resolve_padding(style.padding().inline_start);
+
+        let mut mbp_end = Au(0);
 
         // Look to following elements for text to collect.
         // A text run may be made of various text items, or various
@@ -145,36 +261,65 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
         // in a e.g. space, or other place where we can slice the
         // shaping result, and carry on.
         let mut advance = 1;
+        let mut break_if_not_end = false;
+
         loop {
             let following_item = match self.fc.items.get(self.current_position.item_index + advance) {
                 Some(item) => item,
                 None => break,
             };
 
+            if let InlineItem::TagEnd(node) = *following_item {
+                let end_style = &self.fc.context.layout_tree[node].style;
+                if !break_if_not_end && !can_continue_run(style, end_style, /* at_beginning = */ false) {
+                    break_if_not_end = true;
+                }
+
+                mbp_end += self.resolve_margin(end_style.margin().inline_end) +
+                           end_style.border_widths().inline_end +
+                           self.resolve_padding(end_style.padding().inline_end);
+
+                self.close_box();
+                advance += 1;
+                continue;
+            }
+
+            if break_if_not_end {
+                break;
+            }
+
             match *following_item {
                 InlineItem::TagStart(node) => {
-                    if !can_continue_run(style, &self.fc.context.layout_tree[node].style, /* at_beginning = */ true) {
+                    if !paragraph.is_empty() &&
+                       !can_continue_run(style, &self.fc.context.layout_tree[node].style, /* at_beginning = */ true) {
                         trace!("Can't continue run with {:?} at start", following_item);
                         break;
                     }
+
+                    self.open_boxes.push(OpenInlineBox {
+                        node,
+                        generated_fragment: false,
+                        children: vec![],
+                    });
+
                     // TODO(emilio): We probably need to record some
-                    // state here to create the right fragment tree.
+                    // state here about where in `paragraph` the current box
+                    // maps, or defer the opening / closing of boxes in this
+                    // loop, or something, to create the right fragment tree.
                 },
-                InlineItem::TagEnd(node) => {
-                    if !can_continue_run(style, &self.fc.context.layout_tree[node].style, /* at_beginning = */ false) {
-                        trace!("Can't continue run with {:?} at end", following_item);
-                        break;
-                    }
-                    // TODO(emilio): We probably need to record some
-                    // state here to create the right fragment tree.
-                },
+                InlineItem::TagEnd(..) => unreachable!(),
                 InlineItem::Text(node, ref s) => {
                     let text_style = &self.fc.context.layout_tree[node].style;
                     if !can_continue_run(style, text_style, /* at_beginning = */ true) {
                         trace!("Can't continue run with text {:?} at start", following_item);
                         break;
                     }
-                    paragraph.to_mut().push_str(&s);
+                    if paragraph.is_empty() {
+                        paragraph = Cow::Borrowed(s);
+                    } else {
+                        paragraph.to_mut().push_str(&s);
+                    }
+
                     // This can only really happen with display: contents, and
                     // text can't have margin/border/padding, so at_beginning
                     // shouldn't matter here.
@@ -195,6 +340,9 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
         // to re-shape later, but we can try to re-use the shape
         // results from the previous run if appropriate to avoid
         // O(n^2) algorithms.
+        //
+        // We also have unbreakable sizes at the start and end (mbp_start and
+        // mbp_end).
         let mut break_opportunities = SmallBitVec::new();
         break_opportunities.resize(paragraph.len(), false);
 
@@ -207,6 +355,7 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
         // and so on...
         trace!("Breaking {:?}", paragraph);
         loop {
+            // TODO: Account for white-space and other similar shenanigans.
             let (result, _hard_break) = breaker.next(&*paragraph);
             if result == paragraph.len() {
                 break;
@@ -229,8 +378,21 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
             trace!("{}", &paragraph[start..]);
         }
 
-        let shaped_run = crate::fonts::shaping::shape(&paragraph, style);
-        //
+        if !self.can_fit(mbp_start) {
+
+        }
+
+        let shaped_runs = crate::fonts::shaping::shape(&paragraph, style);
+        let mut inline_size = mbp_start;
+        self.at_break_opportunity = false;
+        for glyph in shaped_runs.glyphs() {
+            inline_size += glyph.advance;
+            if !self.can_fit(inline_size) {
+                // TODO: Create fragments, reset mbp_start, carry on!
+                self.flush_line();
+            }
+            self.at_break_opportunity = break_opportunities[glyph.byte_offset];
+        }
         // TODO:
         // break_and_shape_text(text, style);
         // advance_as_needed()
@@ -245,9 +407,15 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
             let item = self.fc.items.get(self.current_position.item_index)?;
             match *item {
                 InlineItem::TagStart(node) => {
-                    self.current_position.advance_item();
+                    self.open_boxes.push(OpenInlineBox {
+                        node,
+                        generated_fragment: false,
+                        children: vec![],
+                    });
+                    self.layout_inline_box(&self.fc.context.layout_tree[node].style, "");
                 },
                 InlineItem::TagEnd(..) => {
+                    self.close_box();
                     self.current_position.advance_item();
                 },
                 InlineItem::AtomicInline(node) => {
@@ -259,11 +427,12 @@ impl<'a, 'b, 'c> LineBreaker<'a, 'b, 'c> {
                     self.current_position.advance_item();
                 },
                 InlineItem::Text(node, ref text) => {
-                    self.layout_text(&self.fc.context.layout_tree[node].style, text);
-                    // That could advance multiple items.
+                    self.layout_inline_box(&self.fc.context.layout_tree[node].style, text);
                 },
             }
         }
+
+        self.flush_line();
     }
 
     fn break_and_finish(mut self) -> LayoutResult {
